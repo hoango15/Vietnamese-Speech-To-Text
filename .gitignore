@@ -1,0 +1,5 @@
+# Cau hinh rieng va thong tin bi mat
+.env
+.env.*
+!.env.example
+!.env.*.example
