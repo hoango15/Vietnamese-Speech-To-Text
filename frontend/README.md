@@ -27,7 +27,11 @@ npm run build
 - `src/shared/`: API client, kiểu dữ liệu, hook tác vụ, thông báo và CSS dùng chung từ dự án gốc.
 - `src/app/App.tsx`: điểm chạy riêng cho phần xác thực; sau đăng nhập chỉ hiện tên, email và nút đăng xuất.
 
-Mã tính năng xác thực và các file dùng chung được giữ nguyên từ dự án cục bộ. Router được giới hạn cho phần xác thực; các màn hình dự án, xử lý giọng nói, quản trị và thanh toán không thuộc bản này.
+Mã xác thực được trích từ dự án cục bộ. CSS, component và kiểu dữ liệu dùng chung đã được thu gọn cho phần xác thực, giữ các breakpoint responsive và hỗ trợ giảm chuyển động. Router được giới hạn cho phần xác thực; các màn hình dự án, xử lý giọng nói, quản trị và thanh toán không thuộc bản này.
+
+Trong lúc gửi đăng nhập hoặc đăng ký, các trường và nút chuyển form bị khóa để dữ liệu hiển thị khớp với yêu cầu đang xử lý. Kiểm thử gửi form qua `requestSubmit()` để kiểm tra cả các ràng buộc `required`, email và mật khẩu, cùng trường hợp đăng ký đang chờ phản hồi.
+
+GitHub Actions chạy `npm ci`, `npm test` và `npm run build` khi mã frontend thay đổi trên nhánh `front-end` hoặc trong pull request.
 
 ## Kết nối API
 
