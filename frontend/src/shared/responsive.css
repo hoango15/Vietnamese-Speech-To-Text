@@ -1,0 +1,181 @@
+.app .toolbar {
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.app .toolbar :is(input, select),
+.app .toolbar > .button {
+  min-height: 42px;
+  font-size: 14px;
+}
+.company-filter {
+  max-width: 720px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.paginated-select {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.paginated-select-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+.paginated-select-fields label {
+  min-width: 0;
+}
+.paginated-select-fields :is(input, select) {
+  width: 100%;
+  min-height: 42px;
+  font-size: 14px;
+}
+.paginated-select-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.paginated-select-pagination > div {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.mobile-row-details,
+.mobile-row-status {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .app :is(input, select, textarea),
+  .app .content :is(input, select, textarea) {
+    font-size: 16px;
+  }
+  .app .content :is(select, input:not([type="checkbox"]):not([type="radio"]):not([type="color"])) {
+    min-height: 44px;
+  }
+  .app .button,
+  .app .content :is(.button, .icon-button) {
+    min-height: 44px;
+    min-width: 44px;
+    max-width: 100%;
+    font-size: 14px;
+  }
+  .app .content :is(.row-actions, .editor-toolbar, .pagination, .toolbar, .page-heading) .button {
+    font-size: 14px;
+    min-height: 44px;
+    min-width: 44px;
+    white-space: normal;
+  }
+  .app .content :is(.pagination, .cell-small, .table-project small) {
+    font-size: 12px;
+  }
+  .app .content .tabs > :is(button, a) {
+    font-size: 14px;
+  }
+  .app .content .pagination {
+    gap: 12px;
+    padding: 16px;
+  }
+  .app .content .toolbar > select {
+    flex: 1 1 140px;
+    max-width: 100%;
+    font-size: 16px;
+  }
+  .app .content .toolbar > .search-field {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .company-filter {
+    padding: 14px;
+  }
+  .paginated-select-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .table-wrap > table.responsive-table {
+    min-width: 0;
+    table-layout: fixed;
+    white-space: normal;
+  }
+  .responsive-table .desktop-column {
+    display: none;
+  }
+  .responsive-table :is(th, td) {
+    padding: 14px 12px;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+  .responsive-table :is(th, td):first-child {
+    width: 60%;
+  }
+  .responsive-table th {
+    font-size: 12px;
+  }
+  .responsive-table td,
+  .responsive-table td strong {
+    font-size: 14px;
+  }
+  .responsive-table .table-project {
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .responsive-table .table-project > div {
+    min-width: 0;
+  }
+  .responsive-table .table-project strong {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .responsive-table .file-name-button {
+    overflow-wrap: anywhere;
+    font-size: 14px;
+    min-height: 44px;
+  }
+  .responsive-table .row-actions {
+    gap: 8px;
+  }
+  .responsive-table .text-link {
+    min-height: 44px;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+  .responsive-table .row-actions .button svg {
+    flex-shrink: 0;
+  }
+  .app .responsive-table .mobile-row-status {
+    display: block;
+    margin-top: 8px;
+  }
+  .app .responsive-table .mobile-row-details {
+    display: block;
+    margin-top: 4px;
+  }
+  .mobile-row-details summary {
+    cursor: pointer;
+    min-height: 44px;
+    padding: 12px 0;
+    color: var(--teal);
+    font-size: 14px;
+  }
+  .mobile-row-details dl {
+    margin: 0;
+    font-size: 14px;
+  }
+  .mobile-row-details dt {
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .mobile-row-details dd {
+    margin: 0 0 12px;
+    overflow-wrap: anywhere;
+  }
+}
