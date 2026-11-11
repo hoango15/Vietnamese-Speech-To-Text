@@ -69,9 +69,7 @@ async function fill(selector: string, value: string) {
 
 async function submit() {
   await act(async () => {
-    host.querySelector("form")!.dispatchEvent(
-      new Event("submit", { bubbles: true, cancelable: true }),
-    );
+    host.querySelector("form")!.requestSubmit();
   });
 }
 
@@ -128,6 +126,44 @@ it("registers through the API then returns to login with cleared passwords", asy
   expect(host.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe("");
 });
 
+it("locks registration fields until the pending request completes", async () => {
+  await renderApp();
+  await click("Đăng ký");
+  await fill('[name="full_name"]', session.user.full_name);
+  await fill('[name="email"]', session.user.email);
+  await fill('input[type="password"]', "TestPassword123");
+  await fill('label:last-of-type input', "TestPassword123");
+  let finish!: (response: Response) => void;
+  fetchMock.mockReturnValueOnce(new Promise<Response>((resolve) => { finish = resolve; }));
+  await submit();
+  const fields = Array.from(host.querySelectorAll("input"));
+  const fieldsLocked = fields.every((field) => field.disabled);
+  const submitLocked = host.querySelector<HTMLButtonElement>(".auth-submit")!.disabled;
+  await act(async () => finish(Response.json({ user_id: session.user.user_id }, { status: 201 })));
+  expect(fieldsLocked).toBe(true);
+  expect(submitLocked).toBe(true);
+  expect(host.querySelector<HTMLInputElement>('[name="email"]')?.value).toBe(session.user.email);
+  expect(host.querySelector<HTMLInputElement>('[name="email"]')?.disabled).toBe(false);
+});
+
+it.each([
+  { name: "", email: "user@example.test", password: "TestPassword123" },
+  { name: "Nguyễn Văn An", email: "invalid-email", password: "TestPassword123" },
+  { name: "Nguyễn Văn An", email: "user@example.test", password: "short1" },
+  { name: "Nguyễn Văn An", email: "user@example.test", password: "NoDigitsInPassword" },
+])("blocks invalid registration before making a request: %j", async ({ name, email, password }) => {
+  await renderApp();
+  await click("Đăng ký");
+  await fill('[name="full_name"]', name);
+  await fill('[name="email"]', email);
+  await fill('input[type="password"]', password);
+  await fill('label:last-of-type input', password);
+  await submit();
+  expect(host.querySelector("form")?.checkValidity()).toBe(false);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh"]);
+  expect(host.querySelector("h2")?.textContent).toBe("Tạo tài khoản");
+});
+
 it("logs in through the API and shows the signed-in account", async () => {
   await renderApp();
   await fillLogin();
@@ -150,6 +186,7 @@ it("shows an API login error and keeps the visitor on the login form", async () 
   expect(host.querySelector('[role="alert"]')?.textContent).toContain("Email hoặc mật khẩu không đúng.");
   expect(window.location.pathname).toBe("/login");
   expect(host.querySelector<HTMLButtonElement>('[type="submit"], .auth-submit')?.disabled).toBe(false);
+  expect(Array.from(host.querySelectorAll("input")).every((field) => !field.disabled)).toBe(true);
 });
 
 it("restores an existing session without displaying the login form", async () => {

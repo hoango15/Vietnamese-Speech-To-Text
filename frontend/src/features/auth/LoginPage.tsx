@@ -131,6 +131,7 @@ export function LoginPage() {
               <input
                 name="full_name"
                 autoComplete="name"
+                disabled={busy}
                 required
                 maxLength={200}
                 placeholder="Nguyễn Văn An"
@@ -143,6 +144,7 @@ export function LoginPage() {
               name="email"
               type="email"
               autoComplete="email"
+              disabled={busy}
               required
               placeholder="ban@congty.vn"
             />
@@ -152,6 +154,7 @@ export function LoginPage() {
             <input
               type="password"
               autoComplete={register ? "new-password" : "current-password"}
+              disabled={busy}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               minLength={register ? 10 : 1}
@@ -178,6 +181,7 @@ export function LoginPage() {
               <input
                 type="password"
                 autoComplete="new-password"
+                disabled={busy}
                 value={confirm}
                 onChange={(event) => setConfirm(event.target.value)}
                 required
