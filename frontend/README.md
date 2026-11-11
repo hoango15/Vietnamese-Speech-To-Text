@@ -1,6 +1,6 @@
-# Frontend đăng nhập và đăng ký — Thanh Âm
+# Frontend Thanh Âm — xác thực và khung ứng dụng
 
-Phần giao diện xác thực của Vietnamese Speech To Text, dùng React 19, TypeScript và Vite.
+Giao diện xác thực và khung ứng dụng của Vietnamese Speech To Text, dùng React 19, TypeScript và Vite.
 
 ## Chạy giao diện
 
@@ -25,9 +25,18 @@ npm run build
 - `src/features/auth/AuthProvider.tsx`: khôi phục và quản lý phiên đăng nhập.
 - `src/features/auth/LogoutPage.tsx`: kết thúc phiên để có thể đăng nhập tài khoản khác.
 - `src/shared/`: API client, kiểu dữ liệu, hook tác vụ, thông báo và CSS dùng chung từ dự án gốc.
-- `src/app/App.tsx`: điểm chạy riêng cho phần xác thực; sau đăng nhập chỉ hiện tên, email và nút đăng xuất.
+- `src/app/layouts/WorkspaceLayout.tsx`: sidebar, header, footer, menu di động và chặn truy cập khi chưa đăng nhập.
+- `src/app/layouts/navigation.ts`: khai báo đường dẫn và nhãn điều hướng dùng chung cho sidebar, header và router.
+- `src/app/layouts/workspace.css`: CSS khung ứng dụng và menu responsive, trích riêng từ giao diện gốc.
+- `src/app/App.tsx`: router các trang xác thực, nội dung trong khung ứng dụng và trang không tìm thấy.
 
-Mã xác thực được trích từ dự án cục bộ. CSS, component và kiểu dữ liệu dùng chung đã được thu gọn cho phần xác thực, giữ các breakpoint responsive và hỗ trợ giảm chuyển động. Router được giới hạn cho phần xác thực; các màn hình dự án, xử lý giọng nói, quản trị và thanh toán không thuộc bản này.
+Mã giao diện được trích từ dự án cục bộ. CSS, component và kiểu dữ liệu chỉ gồm phần xác thực và khung ứng dụng, giữ các breakpoint responsive và hỗ trợ giảm chuyển động.
+
+Sau đăng nhập, khung hiển thị tên và email tài khoản. Các mục dự án, thư viện, kho tệp, từ điển, thanh toán, hồ sơ, thông báo và cài đặt đã có đường dẫn, nhưng hiện chỉ hiển thị thông báo màn hình sẽ được bổ sung. Ô tìm kiếm trên header chuyển tới `/search?q=...`; chưa tải kết quả tìm kiếm. Chưa kèm Dashboard, tác vụ xử lý hay nghiệp vụ của các mục này; khung không gọi API tính năng và không hiển thị thống kê hoặc thông báo giả.
+
+Nếu mở đường dẫn được bảo vệ khi chưa đăng nhập, ứng dụng chuyển tới `/login` và trở lại đúng đường dẫn, tham số và phần neo sau khi xác thực. Liên kết quản trị chỉ hiện theo vai trò; đường dẫn quản trị không phù hợp hiển thị từ chối truy cập. Đây là kiểm soát giao diện; API vẫn phải kiểm tra quyền ở máy chủ.
+
+Trên màn hình rộng tối đa 760px, sidebar chuyển thành menu đóng/mở. Menu hỗ trợ Escape, giới hạn focus, khóa cuộn nền và khôi phục focus khi đóng; có liên kết bỏ qua điều hướng để đến nội dung chính.
 
 Trong lúc gửi đăng nhập hoặc đăng ký, các trường và nút chuyển form bị khóa để dữ liệu hiển thị khớp với yêu cầu đang xử lý. Kiểm thử gửi form qua `requestSubmit()` để kiểm tra cả các ràng buộc `required`, email và mật khẩu, cùng trường hợp đăng ký đang chờ phản hồi.
 

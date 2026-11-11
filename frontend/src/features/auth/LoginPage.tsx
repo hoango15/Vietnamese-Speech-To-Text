@@ -16,7 +16,12 @@ export function LoginPage() {
     { run, busy } = useAction(),
     navigate = useNavigate(),
     location = useLocation();
-  if (user) return <Navigate to="/" replace />;
+  const from = location.state?.from;
+  const destination =
+    typeof from === "string" && from.startsWith("/") && !from.startsWith("//")
+      ? from
+      : "/";
+  if (user) return <Navigate to={destination} replace />;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setValidation("");
@@ -45,15 +50,7 @@ export function LoginPage() {
           body: { email: form.get("email"), password },
         });
         api.setSession(session);
-        const from = location.state?.from;
-        navigate(
-          typeof from === "string" &&
-            from.startsWith("/") &&
-            !from.startsWith("//")
-            ? from
-            : "/",
-          { replace: true },
-        );
+        navigate(destination, { replace: true });
       }
     });
   }

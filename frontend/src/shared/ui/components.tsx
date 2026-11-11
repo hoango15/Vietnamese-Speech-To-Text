@@ -8,6 +8,20 @@ export function Loading() {
   );
 }
 
+export function Avatar({ name }: { name: string }) {
+  return (
+    <span className="avatar">
+      {name
+        .split(" ")
+        .filter(Boolean)
+        .slice(-2)
+        .map((s) => s[0])
+        .join("")
+        .toUpperCase()}
+    </span>
+  );
+}
+
 export function ErrorBox({
   error,
   retry,

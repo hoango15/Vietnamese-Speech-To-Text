@@ -173,7 +173,7 @@ it("logs in through the API and shows the signed-in account", async () => {
   expect(url).toBe("/api/auth/login");
   expect(options.method).toBe("POST");
   expect(JSON.parse(options.body as string)).toEqual({ email: session.user.email, password: "TestPassword123" });
-  expect(host.textContent).toContain("Đăng nhập thành công");
+  expect(host.querySelector("main")?.textContent).toContain(session.user.full_name);
   expect(host.textContent).toContain(session.user.full_name);
   expect(window.location.pathname).toBe("/");
 });
@@ -193,7 +193,7 @@ it("restores an existing session without displaying the login form", async () =>
   fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   expect(host.textContent).toContain(session.user.email);
-  expect(host.querySelector("form")).toBeNull();
+  expect(host.querySelector(".auth-form")).toBeNull();
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
@@ -209,4 +209,127 @@ it("logs out only after confirmation then allows another login", async () => {
   expect(host.textContent).toContain("Đã đăng xuất");
   await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/login"]')!.click());
   expect(host.querySelector("h2")?.textContent).toBe("Chào mừng trở lại");
+});
+
+it("renders the protected workspace shell without loading unpublished feature APIs", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  expect(host.querySelector('nav[aria-label="Điều hướng chính"]')).not.toBeNull();
+  expect(host.querySelector("header")).not.toBeNull();
+  expect(host.querySelector("main#main-content")).not.toBeNull();
+  expect(host.querySelector("footer")).not.toBeNull();
+  expect(host.querySelector('a[href="#main-content"]')).not.toBeNull();
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh"]);
+});
+
+it("returns to the requested protected URL after login", async () => {
+  window.history.replaceState(null, "", "/projects?view=personal#latest");
+  await renderApp();
+  expect(window.location.pathname).toBe("/login");
+  expect(host.querySelector("aside")).toBeNull();
+  expect(window.history.state?.usr?.from).toBe("/projects?view=personal#latest");
+  await fillLogin();
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await submit();
+  expect(window.location.pathname + window.location.search + window.location.hash)
+    .toBe("/projects?view=personal#latest");
+  expect(host.querySelector("main h1")?.textContent).toBe("Dự án");
+});
+
+it("navigates between workspace sections and marks only the active sidebar link", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  const files = host.querySelector<HTMLAnchorElement>('nav a[href="/files"]');
+  expect(files).not.toBeNull();
+  await act(async () => files!.click());
+  expect(window.location.pathname).toBe("/files");
+  expect(files?.getAttribute("aria-current")).toBe("page");
+  expect(host.querySelectorAll('nav a[aria-current="page"]')).toHaveLength(1);
+  expect(host.querySelector("main h1")?.textContent).toBe("Kho tệp");
+  expect(host.querySelector("main")?.textContent).toContain("sẽ được bổ sung");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+it("routes header search with trimmed query text without fabricating search results", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  expect(host.querySelector(".top-search")).not.toBeNull();
+  await fill('.top-search input', "  tiếng Việt & phụ đề  ");
+  await act(async () => host.querySelector<HTMLFormElement>(".top-search")!.requestSubmit());
+  expect(window.location.pathname).toBe("/search");
+  expect(new URLSearchParams(window.location.search).get("q")).toBe("tiếng Việt & phụ đề");
+  expect(host.querySelector("main h1")?.textContent).toBe("Tìm kiếm nội dung");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  const sidebar = host.querySelector<HTMLElement>(".sidebar");
+  expect(sidebar).not.toBeNull();
+  const menu = host.querySelector<HTMLButtonElement>('[aria-label="Mở menu"]')!;
+  expect(sidebar!.hasAttribute("inert")).toBe(true);
+  await act(() => menu.click());
+  expect(menu.getAttribute("aria-expanded")).toBe("true");
+  expect(sidebar!.getAttribute("role")).toBe("dialog");
+  expect(sidebar!.hasAttribute("inert")).toBe(false);
+  expect(host.querySelector(".app-main")?.hasAttribute("inert")).toBe(true);
+  expect(document.body.style.overflow).toBe("hidden");
+  const controls = Array.from(sidebar!.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)'));
+  controls.at(-1)!.focus();
+  await act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true })));
+  expect(document.activeElement).toBe(controls[0]);
+  await act(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+  expect(sidebar!.hasAttribute("inert")).toBe(true);
+  expect(menu.getAttribute("aria-expanded")).toBe("false");
+  expect(document.activeElement).toBe(menu);
+  expect(document.body.style.overflow).toBe("");
+});
+
+it("closes the mobile menu after following a section link", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  expect(host.querySelector('[aria-label="Mở menu"]')).not.toBeNull();
+  await act(() => host.querySelector<HTMLButtonElement>('[aria-label="Mở menu"]')!.click());
+  await act(async () => host.querySelector<HTMLAnchorElement>('nav a[href="/files"]')!.click());
+  expect(window.location.pathname).toBe("/files");
+  expect(host.querySelector(".sidebar")?.hasAttribute("inert")).toBe(true);
+  expect(host.querySelector(".app-main")?.hasAttribute("inert")).toBe(false);
+  expect(host.querySelector(".sidebar-backdrop")).toBeNull();
+});
+
+it.each([
+  ["MEMBER", null],
+  ["ADMIN", "/admin"],
+  ["COMPANY_OWNER", "/company"],
+] as const)("shows management navigation for the %s role", async (role, managementPath) => {
+  fetchMock.mockResolvedValueOnce(Response.json({ ...session, user: { ...session.user, user_role_code: role } }));
+  await renderApp();
+  expect(host.querySelector('nav[aria-label="Cài đặt"]')).not.toBeNull();
+  const admin = host.querySelector('nav a[href="/admin"]');
+  const company = host.querySelector('nav a[href="/company"]');
+  expect(Boolean(admin)).toBe(managementPath === "/admin");
+  expect(Boolean(company)).toBe(managementPath === "/company");
+});
+
+it("rejects direct management navigation by a member", async () => {
+  window.history.replaceState(null, "", "/admin");
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  expect(host.querySelector("main h1")?.textContent).toBe("Bạn không có quyền truy cập");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+it("lets the user cancel logout and return to the previous workspace section", async () => {
+  window.history.replaceState(null, "", "/files?kind=audio");
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  await act(async () => host.querySelector<HTMLAnchorElement>('a[aria-label="Đăng xuất"]')!.click());
+  expect(host.textContent).toContain("Xác nhận đăng xuất");
+  await click("Hủy");
+  expect(window.location.pathname + window.location.search).toBe("/files?kind=audio");
+  expect(host.querySelector("main h1")?.textContent).toBe("Kho tệp");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
 });
