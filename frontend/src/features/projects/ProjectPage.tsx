@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useBlocker, useParams } from "react-router-dom";
 import { ArrowLeft, Clock3, Users } from "lucide-react";
 import type { List, Media, Project } from "../../shared/types";
 import { date } from "../../shared/lib/format";
@@ -12,6 +12,19 @@ import "./media/media.css";
 export default function ProjectPage() {
   const { id } = useParams();
   const [sourceBusy, setSourceBusy] = useState(false);
+  const [recordingDirty, setRecordingDirty] = useState(false);
+  const blocker = useBlocker(recordingDirty);
+  useEffect(() => {
+    if (blocker.state !== "blocked") return;
+    if (confirm("Bỏ bản thu và chữ chưa lưu để rời trang? Hãy tải xuống trước nếu cần giữ lại.")) blocker.proceed();
+    else blocker.reset();
+  }, [blocker]);
+  useEffect(() => {
+    if (!recordingDirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [recordingDirty]);
   const project = useResource<Project>("/projects/" + id);
   const media = useResource<List<Media>>(project.data && !project.data.deleted_at ? `/projects/${id}/media` : null);
   if (project.loading && !project.data) return <Loading />;
@@ -30,8 +43,8 @@ export default function ProjectPage() {
         <span>Người quản lý: {p.owner_name}</span>
       </div>
       <div className="project-media-layout">
-        <MediaPanel key={p.project_id} project={p} media={media.data?.items ?? []} loading={media.loading} error={media.error} reload={media.reload} disabled={sourceBusy} />
-        {p.can_edit && <UploadPanel key={p.project_id + ":upload"} project={p} onComplete={media.reload} canChangeSource={() => true} onUploading={setSourceBusy} />}
+        <MediaPanel key={p.project_id} project={p} media={media.data?.items ?? []} loading={media.loading} error={media.error} reload={media.reload} disabled={sourceBusy || recordingDirty} />
+        {p.can_edit && <UploadPanel key={p.project_id + ":upload"} project={p} onComplete={media.reload} canChangeSource={() => true} onUploading={setSourceBusy} onRecordingDirty={setRecordingDirty} />}
       </div>
     </>}
   </>;

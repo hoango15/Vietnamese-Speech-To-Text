@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import App from "../../app/App";
 import { api } from "../../shared/api/client";
 import type { Project, Session } from "../../shared/types";
+import { browserRecording } from "./media/recording.test-helpers";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 const project = {
@@ -107,4 +108,26 @@ it("hides file controls for deleted projects", async () => {
   expect(host.textContent).toContain("Dự án đã bị xóa");
   expect(host.querySelector(".upload-card")).toBeNull();
   expect(host.querySelector(".media-card")).toBeNull();
+});
+
+it("protects a live recording from navigation and releases the microphone when leaving is confirmed", async () => {
+  const browser = browserRecording();
+  await mount(url => Response.json(url === "/api/projects/p1/media" ? { items: [media], total: 1 }
+    : url === "/api/system/capabilities" ? { asr: false, ocr: false, diarization: false, llm: false, asr_model: "", max_upload_bytes: 1024 }
+    : { items: [], total: 0 }));
+  const start = [...host.querySelectorAll("button")].find(item => item.textContent?.trim() === "Bắt đầu thu");
+  expect(start).toBeDefined();
+  await act(() => start!.click());
+  expect(host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')?.disabled).toBe(true);
+  const unload = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(unload);
+  expect(unload.defaultPrevented).toBe(true);
+  const back = host.querySelector<HTMLAnchorElement>(".back-link")!;
+  vi.stubGlobal("confirm", () => false);
+  await act(() => back.click());
+  expect(window.location.pathname).toBe("/projects/p1");
+  expect(browser.tracks[0].stop).not.toHaveBeenCalled();
+  vi.stubGlobal("confirm", () => true);
+  await act(() => back.click());
+  expect(window.location.pathname).toBe("/projects");
+  expect(browser.tracks[0].stop).toHaveBeenCalled();
 });

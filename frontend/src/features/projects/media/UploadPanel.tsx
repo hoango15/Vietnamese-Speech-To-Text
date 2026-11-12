@@ -9,6 +9,7 @@ import { message } from "../../../shared/lib/errors";
 import { useAuth } from "../../auth/AuthProvider";
 import { useNotice } from "../../../shared/ui/NoticeProvider";
 import { useResource } from "../../../shared/hooks/useResource";
+import { RecordingPanel } from "./RecordingPanel";
 
 interface SavedUpload {
   id: string;
@@ -28,11 +29,13 @@ export function UploadPanel({
   onComplete,
   canChangeSource,
   onUploading,
+  onRecordingDirty,
 }: {
   project: Project;
   onComplete: () => void;
   canChangeSource: () => boolean;
   onUploading: (busy: boolean) => void;
+  onRecordingDirty?: (dirty: boolean) => void;
 }) {
   const { user } = useAuth(),
     key = `thanh-am-upload:${user?.user_id}:${project.project_id}`,
@@ -51,6 +54,8 @@ export function UploadPanel({
     [error, setError] = useState(""),
     [drag, setDrag] = useState(false),
     [status, setStatus] = useState(""),
+    [recordingActive, setRecordingActive] = useState(false),
+    [savedRecording, setSavedRecording] = useState<File | null>(null),
     controller = useRef<AbortController | null>(null),
     input = useRef<HTMLInputElement>(null),
     notice = useNotice();
@@ -77,7 +82,7 @@ export function UploadPanel({
   }
   function choose(files: ArrayLike<File> | null) {
     const file = files?.[0];
-    if (!file || busy) return false;
+    if (!file || busy || recordingActive) return false;
     if (
       saved &&
       (saved.name !== file.name ||
@@ -109,7 +114,7 @@ export function UploadPanel({
     }
   }
   async function start() {
-    if (!file || busy) return;
+    if (!file || busy || recordingActive) return;
     if (!canChangeSource()) {
       setError(
         "Hãy lưu hoặc bỏ các chỉnh sửa nội dung trước khi thay đổi tệp nguồn.",
@@ -176,6 +181,7 @@ export function UploadPanel({
           signal: controller.current.signal,
         });
         persist(null);
+        setSavedRecording(file);
         setFile(batch[index + 1] ?? null);
         setRemaining(batch.slice(index + 2));
         setProgress(0);
@@ -213,6 +219,18 @@ export function UploadPanel({
   }
   return (
     <div className="card upload-card">
+      {project.can_edit && project.project_type !== "VIDEO" && project.project_type !== "IMAGE" && <RecordingPanel
+        onSelect={recorded => choose([recorded])}
+        onDiscard={recorded => {
+          if (file === recorded && !saved) {
+            setFile(null);
+            setStatus("");
+          }
+        }}
+        onDirty={onRecordingDirty} onActive={setRecordingActive} savedFile={savedRecording}
+        disabled={busy || !!saved} maxBytes={capabilities.data?.max_upload_bytes ?? 100 * 1024 * 1024}
+        language={project.language_code}
+      />}
       <h3>{saved ? "Tiếp tục tải tệp" : "Tải tệp lên"}</h3>
       <input
         type="file"
@@ -222,7 +240,7 @@ export function UploadPanel({
         aria-label="Tệp nguồn từ máy tính"
         tabIndex={-1}
         accept={extensions.map(extension => "." + extension).join(",")}
-        disabled={busy}
+        disabled={busy || recordingActive}
         onChange={(event) => {
           choose(event.target.files);
           event.target.value = "";
@@ -232,10 +250,10 @@ export function UploadPanel({
         className={"upload-drop " + (drag ? "drag" : "")}
         role="group"
         aria-label="Kéo thả hoặc chọn tệp nguồn"
-        aria-disabled={busy}
+        aria-disabled={busy || recordingActive}
         onDragOver={(event) => {
           event.preventDefault();
-          if (!busy) setDrag(true);
+          if (!busy && !recordingActive) setDrag(true);
         }}
         onDragLeave={() => setDrag(false)}
         onDrop={(event) => {
@@ -249,7 +267,7 @@ export function UploadPanel({
         <button
           type="button"
           className="button secondary small"
-          disabled={busy}
+          disabled={busy || recordingActive}
           onClick={() => input.current?.click()}
         >
           <FolderOpen size={16} />
@@ -290,7 +308,7 @@ export function UploadPanel({
             Tạm dừng
           </button>
         ) : (
-          <button className="button small" onClick={start} disabled={!file}>
+          <button className="button small" onClick={start} disabled={!file || recordingActive}>
             {saved ? "Tiếp tục" : "Tải lên"}
           </button>
         )}

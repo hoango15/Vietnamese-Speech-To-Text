@@ -27,6 +27,13 @@
 .upload-drop[aria-disabled="true"] { opacity: .65; }
 .upload-card > .row-actions { margin-top: 14px; }
 .upload-card > .progress { margin-top: 14px; }
+.recording-panel { min-width: 0; margin-bottom: 22px; padding-bottom: 20px; border-bottom: 1px solid #dce7e2; overflow-wrap: anywhere; }
+.recording-panel h3 { display: flex; align-items: center; gap: 8px; }
+.recording-panel p, .recording-panel .row-actions, .recording-panel label { margin-top: 12px; }
+.recording-panel .button { max-width: 100%; white-space: normal; }
+.recording-panel textarea, .recording-panel audio { display: block; width: 100%; max-width: 100%; min-width: 0; margin-top: 10px; }
+.recording-panel textarea { resize: vertical; overflow-wrap: anywhere; }
+.recording-live { margin-top: 12px; padding: 12px; min-height: 80px; max-height: 240px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid #dce7e2; border-radius: 8px; }
 @media (min-width: 1100px) {
   .project-media-layout:has(.upload-card) { grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); }
 }

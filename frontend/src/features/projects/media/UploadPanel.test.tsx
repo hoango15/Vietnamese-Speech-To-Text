@@ -6,6 +6,7 @@ import { api } from "../../../shared/api/client";
 import type { Project } from "../../../shared/types";
 import { NoticeProvider } from "../../../shared/ui/NoticeProvider";
 import { UploadPanel } from "./UploadPanel";
+import { browserRecording } from "./recording.test-helpers";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 const roots: ReturnType<typeof createRoot>[] = [];
@@ -146,4 +147,35 @@ it("restores a saved upload after reopening and sends only the missing bytes", a
   expect(chunks).toEqual([{ offset: "2", text: "cd" }]);
   expect(requests.some(item => item.url === "/api/uploads/init")).toBe(false);
   expect(localStorage.length).toBe(0);
+});
+
+it("previews a microphone recording and uploads its actual audio data", async () => {
+  const browser = browserRecording();
+  const { host, requests } = await mount("AUDIO");
+  expect(browser.microphone).not.toHaveBeenCalled();
+  await act(() => button(host, "Bắt đầu thu").click());
+  expect(button(host, "Chọn tệp từ máy tính").disabled).toBe(true);
+  await act(() => button(host, "Dừng thu").click());
+  expect(host.querySelector('audio[aria-label="Nghe lại bản thu"]')).not.toBeNull();
+  await act(() => button(host, "Dùng bản thu làm nguồn").click());
+  await act(() => button(host, "Tải lên").click());
+  expect(await (requests.find(item => item.method === "PATCH")!.body as Blob).text()).toBe("recorded-audio");
+  expect(requests.some(item => item.url.includes("/jobs"))).toBe(false);
+});
+
+it.each(["VIDEO", "IMAGE"] as const)("hides audio recording for %s projects", async kind => {
+  browserRecording(); const { host } = await mount(kind);
+  expect([...host.querySelectorAll("button")].some(item => item.textContent?.trim() === "Bắt đầu thu")).toBe(false);
+});
+
+it("removes a discarded recording from the pending upload", async () => {
+  browserRecording(); const { host, requests } = await mount("AUDIO");
+  await act(() => button(host, "Bắt đầu thu").click());
+  await act(() => button(host, "Dừng thu").click());
+  await act(() => button(host, "Dùng bản thu làm nguồn").click());
+  expect(button(host, "Tải lên").disabled).toBe(false);
+  vi.stubGlobal("confirm", () => true);
+  await act(() => button(host, "Bỏ bản thu").click());
+  expect(button(host, "Tải lên").disabled).toBe(true);
+  expect(requests.some(item => item.url === "/api/uploads/init")).toBe(false);
 });
