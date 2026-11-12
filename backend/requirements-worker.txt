@@ -1,0 +1,6 @@
+-r requirements.txt
+faster-whisper==1.2.1
+Resemblyzer==0.1.4
+librosa==0.11.0
+scikit-learn==1.8.0
+
