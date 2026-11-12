@@ -1,0 +1,18 @@
+.back-link { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; margin-bottom: 18px; }
+.back-link:hover { color: var(--teal); }
+.project-meta { display: flex; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 11px; margin-bottom: 20px; }
+.project-meta > span { display: flex; align-items: center; gap: 7px; }
+.project-media-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+.media-card, .upload-card { padding: 20px; min-width: 0; }
+.media-card .section-heading { margin-bottom: 17px; }
+.media-select { width: 100%; margin-bottom: 14px; font-size: 12px; }
+.media-info { margin: 15px 0; overflow-wrap: anywhere; }
+.media-info strong { display: block; color: var(--heading); }
+.media-info small { display: block; color: var(--muted); margin-top: 7px; }
+.source-empty { text-align: center; padding: 40px 12px; color: var(--muted); }
+.source-empty svg { color: var(--teal); }
+.source-empty p { margin-top: 12px; }
+.small-text { font-size: 11px; line-height: 1.8; }
+@media (max-width: 480px) {
+  .media-card, .upload-card { padding: 16px; }
+}

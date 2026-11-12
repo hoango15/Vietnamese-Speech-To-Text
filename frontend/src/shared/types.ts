@@ -61,3 +61,15 @@ export interface List<T> {
   items: T[];
   total: number;
 }
+
+export interface Media {
+  media_file_id: string;
+  project_id: string;
+  media_kind_code: string;
+  mime_type: string;
+  file_name: string;
+  file_size_bytes: number;
+  duration_ms: number;
+  created_at: string;
+  is_current: boolean;
+}

@@ -62,6 +62,8 @@ beforeEach(() => {
     if (url === "/api/auth/refresh")
       return Response.json({ detail: "Phiên đã hết hạn." }, { status: 401 });
     if (url === "/api/dashboard") return Response.json(dashboard);
+    if (url === "/api/projects/recent-project") return Response.json(recentProject);
+    if (url === "/api/projects/recent-project/media") return Response.json({ items: [], total: 0 });
     if (url.startsWith("/api/projects?")) return Response.json({ items: [], total: 0 });
     if (url.startsWith("/api/companies?")) return Response.json({ items: [], total: 0 });
     throw new Error(`Unexpected API call: ${url}`);
@@ -506,9 +508,9 @@ it("renders recent project cards with their status, progress and destination", a
   expect(cards[1].querySelector(".file-icon.blue")).not.toBeNull();
   await act(async () => cards[0].click());
   expect(window.location.pathname).toBe("/projects/recent-project");
-  expect(host.querySelector("main h1")?.textContent).toBe("Dự án");
-  expect(host.querySelector("main")?.textContent).toContain("sẽ được bổ sung");
-  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
+  expect(host.querySelector("main h1")?.textContent).toBe("Cuộc họp tuần");
+  expect(host.querySelector(".source-empty")?.textContent).toContain("Thêm tệp để bắt đầu");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/projects/recent-project/media");
 });
 
 it.each([

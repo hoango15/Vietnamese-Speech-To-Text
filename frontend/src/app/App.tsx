@@ -7,6 +7,7 @@ import {
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
 import { LoginPage } from "../features/auth/LoginPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
+import ProjectPage from "../features/projects/ProjectPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { LogoutPage } from "../features/auth/LogoutPage";
 import { Loading } from "../shared/ui/components";
@@ -47,6 +48,7 @@ export default function App() {
         children: [
           { index: true, element: <DashboardPage /> },
           { path: "projects", element: <ProjectsPage /> },
+          { path: "projects/:id", element: <ProjectPage /> },
           { path: "my-projects", element: <ProjectsPage personal /> },
           ...workspaceSections.filter((section) => !["/", "/my-projects"].includes(section.path)).map((section) => ({
             path: section.path === "/projects" ? "projects/*" : section.path.slice(1),
