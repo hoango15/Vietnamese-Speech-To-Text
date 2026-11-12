@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
-import { AlertCircle, FileAudio, FileImage, FileText, FileVideo, FolderOpen, LoaderCircle } from "lucide-react";
+import { useContext, useEffect, useId, useRef, type ReactNode } from "react";
+import { NoticeLayerContext } from "./NoticeProvider";
+import { AlertCircle, FileAudio, FileImage, FileText, FileVideo, FolderOpen, LoaderCircle, X } from "lucide-react";
 
 export function Loading() {
   return (
@@ -162,5 +163,54 @@ export function Pagination({
         </button>
       </div>
     </div>
+  );
+}
+
+export function Modal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const setNoticeLayer = useContext(NoticeLayerContext);
+  useEffect(() => {
+    const dialog = ref.current;
+    dialog?.showModal();
+    setNoticeLayer(dialog);
+    return () => {
+      dialog?.close();
+      setNoticeLayer((current) => current === dialog ? dialog?.parentElement?.closest("dialog[open]") ?? null : current);
+    };
+  }, [setNoticeLayer]);
+  return (
+    <dialog
+      ref={ref}
+      className="modal"
+      onCancel={onClose}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right ||
+            event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
+      }}
+      aria-labelledby={titleId}
+    >
+      <div className="modal-heading">
+        <h2 id={titleId}>{title}</h2>
+        <button
+          className="icon-button"
+          aria-label="Đóng hộp thoại"
+          onClick={onClose}
+        >
+          <X size={20} />
+        </button>
+      </div>
+      {children}
+    </dialog>
   );
 }

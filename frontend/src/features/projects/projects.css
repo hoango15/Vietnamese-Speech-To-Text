@@ -146,3 +146,35 @@ select:focus-visible, textarea:focus-visible { outline: 3px solid var(--teal); o
   .mobile-row-details dd { margin: 0; overflow-wrap: anywhere; }
   .pagination { flex-wrap: wrap; gap: 12px; }
 }
+
+.modal {
+  border: 1px solid var(--border);
+  padding: 26px;
+  max-width: min(570px, calc(100vw - 32px));
+  width: 570px;
+  max-height: 90dvh;
+  border-radius: 14px;
+  color: inherit;
+  box-shadow: 0 20px 100px #0f283a30;
+  overscroll-behavior: contain;
+}
+.modal::backdrop {
+  background: #1f314755;
+  backdrop-filter: blur(3px);
+}
+.modal-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+  gap: 15px;
+}
+.modal-heading h2 {
+  font-size: 18px;
+}
+
+.modal { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.modal textarea { resize: vertical; }
+@media (max-width: 480px) {
+  .modal { padding: 20px; width: calc(100% - 24px); }
+}

@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { canCreateProject } from "./lib/permissions";
 import type { List, Project } from "../../shared/types";
 import {
@@ -19,11 +20,13 @@ import { useResource } from "../../shared/hooks/useResource";
 import type { Company } from "../../shared/types";
 import { PaginatedSelect } from "../../shared/ui/PaginatedSelect";
 
+import { ProjectForm } from "./components/ProjectForm";
 import "./projects.css";
 
 export function ProjectsPage({ personal = false }: { personal?: boolean }) {
   const { user } = useAuth(),
-    [params, setParams] = useSearchParams();
+    [params, setParams] = useSearchParams(),
+    [modal, setModal] = useState(false);
   const q = params.get("q") ?? "",
     scope = personal ? "PERSONAL" : params.get("scope") ?? "",
     companyId = personal ? "" : params.get("company_id") ?? "",
@@ -53,7 +56,13 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
       <PageTitle
         title={deleted ? "Thùng rác dự án" : personal ? "Dự án cá nhân" : "Dự án"}
         subtitle="Quản lý và cộng tác trên tất cả nội dung của bạn."
-      />
+      >
+        {canCreateProject(user?.user_role_code ?? "") && (
+          <button className="button" onClick={() => setModal(true)}>
+            <Plus size={18} />Tạo dự án
+          </button>
+        )}
+      </PageTitle>
       {personal ? <div className="toolbar" aria-label="Loại dự án cá nhân">
         {[["", "Tất cả"], ["VIDEO", "Video"], ["IMAGE", "Hình ảnh"], ["LECTURE", "Bài giảng"], ["AUDIO", "Âm thanh"]].map(([value, label]) => <button key={value} className={`button ${projectType === value ? "" : "secondary"}`} aria-pressed={projectType === value} onClick={() => filter("project_type", value)}>{label}</button>)}
       </div> : <div className="toolbar" aria-label="Phạm vi dự án">
@@ -174,6 +183,13 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
           />
           {page > 1 && <Pagination page={page} total={data?.total ?? 0} onChange={setPage} />}
         </div>
+      )}
+      {modal && (
+        <ProjectForm
+          initialScope={personal ? "PERSONAL" : undefined}
+          onClose={() => setModal(false)}
+          onSaved={reload}
+        />
       )}
     </>
   );
