@@ -20,6 +20,12 @@ const session: Session = {
   },
 };
 
+const dashboard = {
+  stats: { projects: 12, ready: 8, processing: 3, duration_ms: 3661000, storage_bytes: 1572864 },
+  projects: [],
+  activities: [],
+};
+
 let root: ReturnType<typeof createRoot> | undefined;
 let host: HTMLDivElement;
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -32,6 +38,7 @@ beforeEach(() => {
   fetchMock = vi.fn(async (url: string) => {
     if (url === "/api/auth/refresh")
       return Response.json({ detail: "Phiên đã hết hạn." }, { status: 401 });
+    if (url === "/api/dashboard") return Response.json(dashboard);
     throw new Error(`Unexpected API call: ${url}`);
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -169,7 +176,7 @@ it("logs in through the API and shows the signed-in account", async () => {
   await fillLogin();
   fetchMock.mockResolvedValueOnce(Response.json(session));
   await submit();
-  const [url, options] = fetchMock.mock.calls.at(-1)! as unknown as [string, RequestInit];
+  const [url, options] = fetchMock.mock.calls.find(([url]) => url === "/api/auth/login")! as unknown as [string, RequestInit];
   expect(url).toBe("/api/auth/login");
   expect(options.method).toBe("POST");
   expect(JSON.parse(options.body as string)).toEqual({ email: session.user.email, password: "TestPassword123" });
@@ -195,7 +202,7 @@ it("restores an existing session without displaying the login form", async () =>
   await renderApp();
   expect(host.textContent).toContain(session.user.email);
   expect(host.querySelector(".auth-form")).toBeNull();
-  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
 });
 
 it.each([
@@ -213,7 +220,7 @@ it.each([
   expect(link?.textContent).toBe(action);
   await act(async () => link!.click());
   expect(host.querySelector("main h1")?.textContent).toBe("Dự án");
-  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh"]);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
 });
 
 it("logs out only after confirmation then allows another login", async () => {
@@ -221,7 +228,7 @@ it("logs out only after confirmation then allows another login", async () => {
   await renderApp();
   await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/logout"]')!.click());
   expect(host.textContent).toContain("Xác nhận đăng xuất");
-  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
   fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
   await submit();
   expect(fetchMock.mock.calls.at(-1)?.[0]).toBe("/api/auth/logout");
@@ -230,7 +237,7 @@ it("logs out only after confirmation then allows another login", async () => {
   expect(host.querySelector("h2")?.textContent).toBe("Chào mừng trở lại");
 });
 
-it("renders the protected workspace shell without loading unpublished feature APIs", async () => {
+it("renders the protected workspace shell and loads only the published Dashboard API", async () => {
   fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   expect(host.querySelector('nav[aria-label="Điều hướng chính"]')).not.toBeNull();
@@ -238,7 +245,7 @@ it("renders the protected workspace shell without loading unpublished feature AP
   expect(host.querySelector("main#main-content")).not.toBeNull();
   expect(host.querySelector("footer")).not.toBeNull();
   expect(host.querySelector('a[href="#main-content"]')).not.toBeNull();
-  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh"]);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
 });
 
 it("returns to the requested protected URL after login", async () => {
@@ -266,7 +273,7 @@ it("navigates between workspace sections and marks only the active sidebar link"
   expect(host.querySelectorAll('nav a[aria-current="page"]')).toHaveLength(1);
   expect(host.querySelector("main h1")?.textContent).toBe("Kho tệp");
   expect(host.querySelector("main")?.textContent).toContain("sẽ được bổ sung");
-  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
 it("routes header search with trimmed query text without fabricating search results", async () => {
@@ -278,7 +285,7 @@ it("routes header search with trimmed query text without fabricating search resu
   expect(window.location.pathname).toBe("/search");
   expect(new URLSearchParams(window.location.search).get("q")).toBe("tiếng Việt & phụ đề");
   expect(host.querySelector("main h1")?.textContent).toBe("Tìm kiếm nội dung");
-  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
@@ -351,4 +358,67 @@ it("lets the user cancel logout and return to the previous workspace section", a
   expect(window.location.pathname + window.location.search).toBe("/files?kind=audio");
   expect(host.querySelector("main h1")?.textContent).toBe("Kho tệp");
   expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+it("renders Dashboard statistics from the authenticated API response", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  expect(Array.from(host.querySelectorAll(".stat-value"), (item) => item.textContent))
+    .toEqual(["12", "8", "3", "01:01:01"]);
+  expect(host.querySelector(".stats-grid")?.textContent).toContain("Đã lưu 1.5 MB");
+  const request = fetchMock.mock.calls.find(([url]) => url === "/api/dashboard")!;
+  expect(new Headers((request[1] as RequestInit).headers).get("Authorization"))
+    .toBe("Bearer test-access-token");
+});
+
+it("shows zero statistics when the account has no projects", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session)).mockResolvedValueOnce(Response.json({
+    ...dashboard,
+    stats: { projects: 0, ready: 0, processing: 0, duration_ms: 0, storage_bytes: 0 },
+  }));
+  await renderApp();
+  expect(Array.from(host.querySelectorAll(".stat-value"), (item) => item.textContent))
+    .toEqual(["0", "0", "0", "00:00:00"]);
+  expect(host.querySelector(".stats-grid")?.textContent).toContain("Đã lưu 0 B");
+});
+
+it("shows loading without invented statistics while Dashboard is pending", async () => {
+  let finish!: (response: Response) => void;
+  fetchMock.mockResolvedValueOnce(Response.json(session))
+    .mockReturnValueOnce(new Promise<Response>((resolve) => { finish = resolve; }));
+  await renderApp();
+  expect(host.querySelector('main [role="status"]')?.textContent).toContain("Đang tải dữ liệu");
+  expect(host.querySelector(".stat-value")).toBeNull();
+  await act(async () => finish(Response.json(dashboard)));
+  expect(host.querySelector('main [role="status"]')).toBeNull();
+  expect(host.querySelectorAll(".stat-card")).toHaveLength(4);
+});
+
+it("shows the Dashboard API error and reloads successfully on retry", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session)).mockResolvedValueOnce(
+    Response.json({ detail: "Chưa thể tải tổng quan." }, { status: 503 }),
+  );
+  await renderApp();
+  expect(host.querySelector('main [role="alert"]')?.textContent).toContain("Chưa thể tải tổng quan.");
+  expect(host.querySelector(".stat-value")).toBeNull();
+  await click("Thử lại");
+  expect(host.querySelector('main [role="alert"]')).toBeNull();
+  expect(host.querySelector(".stat-value")?.textContent).toBe("12");
+  expect(fetchMock.mock.calls.map(([url]) => url))
+    .toEqual(["/api/auth/refresh", "/api/dashboard", "/api/dashboard"]);
+});
+
+it("cancels the pending Dashboard request when leaving the page", async () => {
+  let finish!: (response: Response) => void;
+  fetchMock.mockResolvedValueOnce(Response.json(session))
+    .mockReturnValueOnce(new Promise<Response>((resolve) => { finish = resolve; }));
+  await renderApp();
+  const request = fetchMock.mock.calls.find(([url]) => url === "/api/dashboard")!;
+  const signal = (request[1] as RequestInit).signal!;
+  expect(signal.aborted).toBe(false);
+  await act(async () => host.querySelector<HTMLAnchorElement>('nav a[href="/files"]')!.click());
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish(Response.json(dashboard)));
+  expect(host.querySelector("main h1")?.textContent).toBe("Kho tệp");
+  expect(host.querySelector(".stat-value")).toBeNull();
 });

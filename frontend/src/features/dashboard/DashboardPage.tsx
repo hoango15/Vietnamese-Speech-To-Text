@@ -1,12 +1,26 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, AudioLines, Check } from "lucide-react";
+import { ArrowRight, AudioLines, Check, CheckCircle2, Clock3, FolderClosed } from "lucide-react";
 import { canCreateProject } from "../projects/lib/permissions";
-import { PageTitle } from "../../shared/ui/components";
+import { useResource } from "../../shared/hooks/useResource";
+import { bytes, time } from "../../shared/lib/format";
+import { ErrorBox, Loading, PageTitle } from "../../shared/ui/components";
 import { useAuth } from "../auth/AuthProvider";
 import "./dashboard.css";
 
 export function DashboardPage() {
-  const { user } = useAuth();
+  const { user } = useAuth(),
+    { data, error, loading, reload } = useResource<{
+      stats: {
+        projects: number;
+        ready: number;
+        processing: number;
+        duration_ms: number;
+        storage_bytes: number;
+      };
+    }>("/dashboard");
+  if (loading) return <Loading />;
+  if (error) return <ErrorBox error={error} retry={reload} />;
+  if (!data) return null;
   return (
     <>
       <PageTitle
@@ -48,6 +62,49 @@ export function DashboardPage() {
           <AudioLines className="art-audio" size={29} />
         </div>
       </section>
+      <div className="stats-grid">
+        {[
+          {
+            label: "Tổng dự án",
+            value: data.stats.projects,
+            icon: FolderClosed,
+            color: "teal",
+            note: "Trong không gian của bạn",
+          },
+          {
+            label: "Đã hoàn thành",
+            value: data.stats.ready,
+            icon: CheckCircle2,
+            color: "green",
+            note: "Sẵn sàng để sử dụng",
+          },
+          {
+            label: "Đang xử lý",
+            value: data.stats.processing,
+            icon: Clock3,
+            color: "orange",
+            note: "Tiến trình đang hoạt động",
+          },
+          {
+            label: "Thời lượng nội dung",
+            value: time(data.stats.duration_ms),
+            icon: AudioLines,
+            color: "purple",
+            note: `Đã lưu ${bytes(data.stats.storage_bytes)}`,
+          },
+        ].map((stat) => (
+          <div className="stat-card" key={stat.label}>
+            <div>
+              <span>{stat.label}</span>
+              <div className="stat-value">{stat.value}</div>
+              <small>{stat.note}</small>
+            </div>
+            <div className={"stat-icon " + stat.color}>
+              <stat.icon size={22} />
+            </div>
+          </div>
+        ))}
+      </div>
     </>
   );
 }
