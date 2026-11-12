@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Pencil, Plus, Search } from "lucide-react";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { api } from "../../shared/api/client";
 import { canCreateProject } from "./lib/permissions";
 import type { List, Project } from "../../shared/types";
 import {
@@ -15,12 +16,13 @@ import {
   Status,
 } from "../../shared/ui/components";
 import { date } from "../../shared/lib/format";
+import { useAction } from "../../shared/hooks/useAction";
 import { useAuth } from "../auth/AuthProvider";
 import { useResource } from "../../shared/hooks/useResource";
+import { ProjectForm } from "./components/ProjectForm";
 import type { Company } from "../../shared/types";
 import { PaginatedSelect } from "../../shared/ui/PaginatedSelect";
 
-import { ProjectForm } from "./components/ProjectForm";
 import "./projects.css";
 
 export function ProjectsPage({ personal = false }: { personal?: boolean }) {
@@ -33,10 +35,11 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
     companyId = personal ? "" : params.get("company_id") ?? "",
     projectType = params.get("project_type") ?? "",
     status = params.get("status") ?? "",
-    deleted = false,
+    deleted = params.get("deleted") === "true",
     sort = params.get("sort") === "title" ? "title" : "recent",
     requestedPage = Number(params.get("page") ?? 1),
-    page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
+    action = useAction();
   function filter(key: string, value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value); else next.delete(key);
@@ -60,7 +63,8 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
       >
         {canCreateProject(user?.user_role_code ?? "") && (
           <button className="button" onClick={() => setModal(true)}>
-            <Plus size={18} />Tạo dự án
+            <Plus size={18} />
+            Tạo dự án
           </button>
         )}
       </PageTitle>
@@ -112,6 +116,15 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
           <option value="recent">Cập nhật gần nhất</option>
           <option value="title">Tên A–Z (trang này)</option>
         </select>
+        <button
+          className={"button " + (deleted ? "" : "secondary")}
+          onClick={() => {
+            filter("deleted", String(!deleted));
+          }}
+        >
+          <Trash2 size={17} />
+          {deleted ? "Về dự án" : "Thùng rác"}
+        </button>
       </div>
       {error ? (
         <ErrorBox error={error} retry={reload} />
@@ -127,7 +140,9 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
                 <th className="desktop-column">Trạng thái</th>
                 <th className="desktop-column">Người quản lý</th>
                 <th className="desktop-column">Cập nhật</th>
-                <th><span className="sr-only">Thao tác</span></th>
+                <th>
+                  <span className="sr-only">Thao tác</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -166,15 +181,89 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
                   </td>
                   <td className="muted desktop-column">{date(project.updated_at)}</td>
                   <td>
-                    {project.can_manage && (
-                      <button
-                        className="icon-button"
-                        aria-label={"Sửa " + project.project_title}
-                        onClick={() => setEditing(project)}
-                      >
-                        <Pencil size={17} />
-                      </button>
-                    )}
+                    <div className="row-actions">
+                      {project.can_manage &&
+                        (deleted ? (
+                          <>
+                            <button
+                              className="button secondary small"
+                              disabled={action.busy}
+                              onClick={() =>
+                                action.run(async () => {
+                                  await api.request(
+                                    `/projects/${project.project_id}/restore`,
+                                    { method: "POST" },
+                                  );
+                                  reload();
+                                }, "Đã khôi phục dự án.")
+                              }
+                            >
+                              Khôi phục
+                            </button>
+                            {user?.user_role_code === "ADMIN" && (
+                              <button
+                                className="button secondary small"
+                                disabled={action.busy}
+                                onClick={() => {
+                                  if (
+                                    !confirm(
+                                      `Chuyển “${project.project_title}” cho bạn quản lý và khôi phục dự án?`,
+                                    )
+                                  )
+                                    return;
+                                  action.run(async () => {
+                                    await api.request(
+                                      `/projects/${project.project_id}/owner`,
+                                      {
+                                        method: "PATCH",
+                                        body: { user_id: user.user_id },
+                                      },
+                                    );
+                                    await api.request(
+                                      `/projects/${project.project_id}/restore`,
+                                      { method: "POST" },
+                                    );
+                                    reload();
+                                  }, "Đã chuyển quyền quản lý và khôi phục dự án.");
+                                }}
+                              >
+                                Chuyển cho tôi và khôi phục
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              className="icon-button"
+                              aria-label={"Sửa " + project.project_title}
+                              onClick={() => setEditing(project)}
+                            >
+                              <Pencil size={17} />
+                            </button>
+                            <button
+                              className="icon-button danger"
+                              aria-label={"Xóa " + project.project_title}
+                              disabled={action.busy}
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Chuyển “${project.project_title}” vào thùng rác?`,
+                                  )
+                                )
+                                  action.run(async () => {
+                                    await api.request(
+                                      "/projects/" + project.project_id,
+                                      { method: "DELETE" },
+                                    );
+                                    reload();
+                                  }, "Đã chuyển vào thùng rác.");
+                              }}
+                            >
+                              <Trash2 size={17} />
+                            </button>
+                          </>
+                        ))}
+                    </div>
                   </td>
                 </tr>
               ))}

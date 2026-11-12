@@ -62,11 +62,11 @@ it("opens the project list through its protected route and displays API results"
 
 it("enforces personal ownership despite conflicting URL filters and resets pagination on type changes", async () => {
   const queries: URLSearchParams[] = [];
-  await mount("/my-projects?scope=TEAM&company_id=foreign&project_type=IMAGE&page=3&status=READY&q=abc", url => {
+  await mount("/my-projects?scope=TEAM&company_id=foreign&project_type=IMAGE&page=3&status=READY&q=abc&deleted=true", url => {
     queries.push(new URL(url, "http://local").searchParams);
     return Response.json({ items: [], total: 0 });
   });
-  expect(Object.fromEntries(queries.at(-1)!)).toMatchObject({ scope: "PERSONAL", owned: "true", page: "3", project_type: "IMAGE", status: "READY", q: "abc" });
+  expect(Object.fromEntries(queries.at(-1)!)).toMatchObject({ scope: "PERSONAL", owned: "true", page: "3", project_type: "IMAGE", status: "READY", q: "abc", deleted: "true" });
   expect(queries.at(-1)!.has("company_id")).toBe(false);
   expect(button("Trước").disabled).toBe(false);
   await act(() => button("Âm thanh").click());
@@ -217,6 +217,7 @@ it("edits a managed project without changing its scope or company", async () => 
 it("hides editing for projects without management permission", async () => {
   await mount("/projects", () => Response.json({ items: [{ ...project, can_manage: false, can_edit: false }], total: 1 }), { ...session.user, user_role_code: "VIEWER" });
   expect(host.querySelector('[aria-label="Sửa Cuộc họp sản phẩm"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Xóa Cuộc họp sản phẩm"]')).toBeNull();
   expect([...host.querySelectorAll("button")].some(item => item.textContent?.trim() === "Tạo dự án")).toBe(false);
 });
 
@@ -231,4 +232,55 @@ it("keeps edited values visible when saving a project fails", async () => {
   await submitDialog();
   expect(document.querySelector('[role="alert"]')?.textContent).toContain("Không có quyền sửa dự án");
   expect(document.querySelector<HTMLInputElement>('[name="project_title"]')?.value).toBe("Nội dung chưa lưu");
+});
+
+it("moves a project to trash after confirmation and restores it from the trash list", async () => {
+  let deleted = false;
+  const mutations: { url: string; method: string }[] = [];
+  vi.stubGlobal("confirm", () => true);
+  await mount("/projects", (url, options) => {
+    if (options.method === "DELETE") { mutations.push({ url, method: options.method }); deleted = true; return new Response(null, { status: 204 }); }
+    if (options.method === "POST") { mutations.push({ url, method: options.method }); deleted = false; return Response.json(project); }
+    const trash = new URL(url, "http://local").searchParams.get("deleted") === "true";
+    return Response.json({ items: trash === deleted ? [{ ...project, deleted_at: deleted ? "2026-11-12T01:00:00Z" : null }] : [], total: trash === deleted ? 1 : 0 });
+  });
+  const remove = host.querySelector<HTMLButtonElement>('[aria-label="Xóa Cuộc họp sản phẩm"]');
+  expect(remove).not.toBeNull();
+  await act(() => remove!.click());
+  expect(mutations).toEqual([{ url: "/api/projects/project", method: "DELETE" }]);
+  expect(host.querySelector("tbody")).toBeNull();
+  await act(() => button("Thùng rác").click());
+  expect(host.querySelector("tbody")?.textContent).toContain(project.project_title);
+  expect(host.querySelector('[aria-label="Sửa Cuộc họp sản phẩm"]')).toBeNull();
+  await act(() => button("Khôi phục").click());
+  expect(mutations).toEqual([{ url: "/api/projects/project", method: "DELETE" }, { url: "/api/projects/project/restore", method: "POST" }]);
+  expect(host.textContent).toContain("Thùng rác trống");
+  await act(() => button("Về dự án").click());
+  expect(host.querySelector("tbody")?.textContent).toContain(project.project_title);
+});
+
+it("keeps a project when deletion is cancelled", async () => {
+  const mutations: string[] = [];
+  vi.stubGlobal("confirm", () => false);
+  await mount("/projects", (url, options) => {
+    if (options.method === "DELETE") mutations.push(url);
+    return Response.json({ items: [project], total: 1 });
+  });
+  const remove = host.querySelector<HTMLButtonElement>('[aria-label="Xóa Cuộc họp sản phẩm"]');
+  expect(remove).not.toBeNull();
+  await act(() => remove!.click());
+  expect(mutations).toEqual([]);
+  expect(host.querySelector("tbody")?.textContent).toContain(project.project_title);
+});
+
+it("shows deletion errors without removing the project from the list", async () => {
+  vi.stubGlobal("confirm", () => true);
+  await mount("/projects", (_url, options) => options.method === "DELETE"
+    ? Response.json({ detail: "Không thể xóa dự án" }, { status: 409 })
+    : Response.json({ items: [project], total: 1 }));
+  const remove = host.querySelector<HTMLButtonElement>('[aria-label="Xóa Cuộc họp sản phẩm"]');
+  expect(remove).not.toBeNull();
+  await act(() => remove!.click());
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Không thể xóa dự án");
+  expect(host.querySelector("tbody")?.textContent).toContain(project.project_title);
 });
