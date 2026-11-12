@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import App from "../../app/App";
 import { api } from "../../shared/api/client";
-import type { Session } from "../../shared/types";
+import type { Project, Session } from "../../shared/types";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 const project = {
@@ -16,18 +16,18 @@ const media = { media_file_id: "m1", project_id: "p1", media_kind_code: "ORIGINA
 const session: Session = { access_token: "token", user: { user_id: "owner", email: "owner@example.test", full_name: "Chủ dự án", user_role_code: "MANAGER", is_active: true, created_at: project.created_at } };
 let root: ReturnType<typeof createRoot> | undefined;
 let host: HTMLDivElement;
-async function mount(handler: (url: string, options: RequestInit) => Response | Promise<Response> = () => Response.json({ items: [media], total: 1 })) {
+async function mount(handler: (url: string, options: RequestInit) => Response | Promise<Response> = () => Response.json({ items: [media], total: 1 }), details: Partial<Project> = {}) {
   api.setSession(null);
   window.history.replaceState(null, "", "/projects/p1");
   vi.stubGlobal("fetch", (url: string, options: RequestInit = {}) => Promise.resolve(url === "/api/auth/refresh"
-    ? Response.json(session) : url === "/api/projects/p1" ? Response.json(project) : handler(url, options)));
+    ? Response.json(session) : url === "/api/projects/p1" ? Response.json({ ...project, ...details }) : handler(url, options)));
   host = document.createElement("div"); document.body.append(host);
   root = createRoot(host);
   await act(async () => root!.render(<App />));
 }
 afterEach(async () => {
   if (root) await act(() => root!.unmount());
-  root = undefined; api.setSession(null); vi.unstubAllGlobals(); document.body.innerHTML = "";
+  root = undefined; api.setSession(null); vi.unstubAllGlobals(); document.body.innerHTML = ""; localStorage.clear();
 });
 
 it("opens project files from the protected detail route with size and duration", async () => {
@@ -68,4 +68,42 @@ it("retries failed source loading without hiding the project title", async () =>
   expect(retry).toBeDefined();
   await act(() => retry!.click());
   expect(host.querySelector(".media-info")?.textContent).toContain("hop.wav");
+});
+
+it("uploads a selected source, shows completion and reloads the server-provided duration", async () => {
+  let completed = false, offset = 0;
+  const requests: { url: string; method: string; body: unknown }[] = [];
+  await mount((url, options) => {
+    requests.push({ url, method: options.method ?? "GET", body: options.body });
+    if (url === "/api/system/capabilities") return Response.json({ asr: false, ocr: false, diarization: false, llm: false, asr_model: "", max_upload_bytes: 1024 });
+    if (url === "/api/projects/p1/media") return Response.json({ items: completed ? [media] : [], total: completed ? 1 : 0 });
+    if (url === "/api/uploads/u1/complete") { completed = true; return Response.json(media); }
+    if (options.method === "PATCH") offset += (options.body as Blob).size;
+    return Response.json({ upload_id: "u1", expected_size_bytes: 4, uploaded_size_bytes: offset, upload_status_code: "UPLOADING" });
+  });
+  const input = host.querySelector<HTMLInputElement>('input[type="file"]');
+  expect(input).not.toBeNull();
+  const files = new DataTransfer(); files.items.add(new File(["wave"], "hop.wav", { type: "audio/wav" }));
+  await act(() => { Object.defineProperty(input, "files", { value: files.files, configurable: true }); input!.dispatchEvent(new Event("change", { bubbles: true })); });
+  const upload = [...host.querySelectorAll("button")].find(item => item.textContent?.trim() === "Tải lên");
+  expect(upload).toBeDefined();
+  await act(() => upload!.click());
+  expect(JSON.parse(String(requests.find(item => item.url === "/api/uploads/init")?.body))).toEqual({ project_id: "p1", file_name: "hop.wav", mime_type: "audio/wav", expected_size_bytes: 4 });
+  expect(await (requests.find(item => item.method === "PATCH")!.body as Blob).text()).toBe("wave");
+  expect(host.querySelector(".upload-card")?.textContent).toContain("Đã tải lên");
+  expect(host.querySelector(".media-info")?.textContent).toContain("00:01:05");
+  expect(requests.some(item => item.url.includes("/jobs"))).toBe(false);
+});
+
+it("hides upload controls for read-only projects", async () => {
+  await mount(undefined, { can_edit: false, can_manage: false });
+  expect(host.querySelector(".media-info")?.textContent).toContain("hop.wav");
+  expect(host.querySelector('input[type="file"]')).toBeNull();
+});
+
+it("hides file controls for deleted projects", async () => {
+  await mount(undefined, { deleted_at: "2026-11-12T01:00:00Z" });
+  expect(host.textContent).toContain("Dự án đã bị xóa");
+  expect(host.querySelector(".upload-card")).toBeNull();
+  expect(host.querySelector(".media-card")).toBeNull();
 });

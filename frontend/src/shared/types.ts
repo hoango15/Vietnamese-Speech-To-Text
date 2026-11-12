@@ -73,3 +73,22 @@ export interface Media {
   created_at: string;
   is_current: boolean;
 }
+
+export interface Capabilities {
+  asr: boolean;
+  ocr: boolean;
+  diarization: boolean;
+  llm: boolean;
+  asr_model: string;
+  asr_provider?: "local" | "colab";
+  text_provider?: "local" | "colab";
+  grammar?: boolean;
+  max_upload_bytes: number;
+}
+
+export interface Upload {
+  upload_id: string;
+  uploaded_size_bytes: number;
+  expected_size_bytes: number;
+  upload_status_code: string;
+}

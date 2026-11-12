@@ -4,12 +4,13 @@ import type { Media, Project } from "../../../shared/types";
 import { bytes, date, time } from "../../../shared/lib/format";
 import { ErrorBox, Loading } from "../../../shared/ui/components";
 
-export function MediaPanel({ project, media, loading, error, reload }: {
+export function MediaPanel({ project, media, loading, error, reload, disabled = false }: {
   project: Project;
   media: Media[];
   loading: boolean;
   error: string;
   reload: () => void;
+  disabled?: boolean;
 }) {
   const [selected, setSelected] = useState("");
   const sources = media.filter(item => item.media_kind_code.startsWith("ORIGINAL_"));
@@ -19,7 +20,7 @@ export function MediaPanel({ project, media, loading, error, reload }: {
     {loading ? <Loading /> : error ? <ErrorBox error={error} retry={reload} /> : !current ? <div className="source-empty">
       <UploadCloud size={32} /><p>Thêm tệp để bắt đầu</p><small>Video, âm thanh hoặc hình ảnh</small>
     </div> : <>
-      <select className="media-select" aria-label="Chọn tệp xem trước" value={current.media_file_id} onChange={event => setSelected(event.target.value)}>
+      <select className="media-select" aria-label="Chọn tệp xem trước" disabled={disabled} value={current.media_file_id} onChange={event => setSelected(event.target.value)}>
         {sources.map(item => <option value={item.media_file_id} key={item.media_file_id}>{item.file_name}</option>)}
       </select>
       <div className="media-info">

@@ -13,6 +13,16 @@
 .source-empty svg { color: var(--teal); }
 .source-empty p { margin-top: 12px; }
 .small-text { font-size: 11px; line-height: 1.8; }
+.upload-card h3 { margin: 0 0 16px; }
+.upload-drop { display: flex; flex-direction: column; align-items: center; gap: 14px; border: 1px dashed #b9d7d1; border-radius: 9px; padding: 28px 16px; text-align: center; background: #f8fbfa; color: var(--muted); margin-bottom: 16px; }
+.upload-drop strong, .upload-drop small { max-width: 100%; overflow-wrap: anywhere; }
+.upload-drop.drag, .upload-drop:focus-within { background: #eaf5f1; border-color: var(--teal); }
+.upload-drop[aria-disabled="true"] { opacity: .65; }
+.upload-card > .row-actions { margin-top: 14px; }
+.upload-card > .progress { margin-top: 14px; }
+@media (min-width: 1100px) {
+  .project-media-layout:has(.upload-card) { grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); }
+}
 @media (max-width: 480px) {
   .media-card, .upload-card { padding: 16px; }
 }

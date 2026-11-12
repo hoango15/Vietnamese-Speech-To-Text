@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Clock3, Users } from "lucide-react";
 import type { List, Media, Project } from "../../shared/types";
@@ -5,10 +6,12 @@ import { date } from "../../shared/lib/format";
 import { Empty, ErrorBox, Loading, PageTitle, Status } from "../../shared/ui/components";
 import { useResource } from "../../shared/hooks/useResource";
 import { MediaPanel } from "./media/MediaPanel";
+import { UploadPanel } from "./media/UploadPanel";
 import "./media/media.css";
 
 export default function ProjectPage() {
   const { id } = useParams();
+  const [sourceBusy, setSourceBusy] = useState(false);
   const project = useResource<Project>("/projects/" + id);
   const media = useResource<List<Media>>(project.data && !project.data.deleted_at ? `/projects/${id}/media` : null);
   if (project.loading && !project.data) return <Loading />;
@@ -27,7 +30,8 @@ export default function ProjectPage() {
         <span>Người quản lý: {p.owner_name}</span>
       </div>
       <div className="project-media-layout">
-        <MediaPanel key={p.project_id} project={p} media={media.data?.items ?? []} loading={media.loading} error={media.error} reload={media.reload} />
+        <MediaPanel key={p.project_id} project={p} media={media.data?.items ?? []} loading={media.loading} error={media.error} reload={media.reload} disabled={sourceBusy} />
+        {p.can_edit && <UploadPanel key={p.project_id + ":upload"} project={p} onComplete={media.reload} canChangeSource={() => true} onUploading={setSourceBusy} />}
       </div>
     </>}
   </>;
