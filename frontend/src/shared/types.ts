@@ -14,3 +14,25 @@ export interface Session {
   access_token: string;
   user: User;
 }
+export interface Project {
+  project_id: string;
+  project_title: string;
+  project_description: string;
+  language_code: string;
+  project_scope?: "PERSONAL" | "TEAM";
+  company_id?: string | null;
+  company_name?: string | null;
+  project_type?: "VIDEO" | "IMAGE" | "LECTURE" | "AUDIO" | null;
+  can_invite?: boolean;
+  project_status_code: string;
+  owner_user_id: string;
+  owner_name: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  can_manage: boolean;
+  can_edit: boolean;
+  member_count: number;
+  media_kind?: string;
+  progress_percent?: number;
+}

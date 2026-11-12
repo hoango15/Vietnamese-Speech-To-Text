@@ -1,3 +1,13 @@
+export function date(value: string | null | undefined) {
+  return value
+    ? new Intl.DateTimeFormat("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(new Date(value))
+    : "—";
+}
+
 export function bytes(value: number) {
   if (!value) return "0 B";
   const unit = Math.min(3, Math.floor(Math.log(value) / Math.log(1024)));

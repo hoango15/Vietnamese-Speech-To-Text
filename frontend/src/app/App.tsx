@@ -46,7 +46,7 @@ export default function App() {
         children: [
           { index: true, element: <DashboardPage /> },
           ...workspaceSections.filter((section) => section.path !== "/").map((section) => ({
-            path: section.path.slice(1),
+            path: section.path === "/projects" ? "projects/*" : section.path.slice(1),
             element: <WorkspaceSection section={section} />,
           })),
           { path: "*", element: <NotFoundPage /> },

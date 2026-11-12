@@ -26,6 +26,29 @@ const dashboard = {
   activities: [],
 };
 
+const recentProject = {
+  project_id: "recent-project",
+  project_title: "Cuộc họp tuần",
+  project_description: "",
+  language_code: "vi",
+  project_scope: "PERSONAL",
+  company_id: null,
+  company_name: null,
+  project_type: "AUDIO",
+  can_invite: true,
+  project_status_code: "PROCESSING",
+  owner_user_id: "test-user",
+  owner_name: "Nguyễn Văn An",
+  created_at: "2026-11-10T00:00:00Z",
+  updated_at: "2026-11-11T00:00:00Z",
+  deleted_at: null,
+  can_manage: true,
+  can_edit: true,
+  member_count: 3,
+  media_kind: "ORIGINAL_AUDIO",
+  progress_percent: 42,
+};
+
 let root: ReturnType<typeof createRoot> | undefined;
 let host: HTMLDivElement;
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -421,4 +444,49 @@ it("cancels the pending Dashboard request when leaving the page", async () => {
   await act(async () => finish(Response.json(dashboard)));
   expect(host.querySelector("main h1")?.textContent).toBe("Kho tệp");
   expect(host.querySelector(".stat-value")).toBeNull();
+});
+
+it("renders recent project cards with their status, progress and destination", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session)).mockResolvedValueOnce(Response.json({
+    ...dashboard,
+    projects: [recentProject, {
+      ...recentProject, project_id: "ready-project", project_title: "Phỏng vấn",
+      project_description: "Nội dung đã xử lý", project_status_code: "READY", media_kind: "ORIGINAL_VIDEO",
+    }],
+  }));
+  await renderApp();
+  const cards = host.querySelectorAll<HTMLAnchorElement>(".project-card");
+  expect(cards).toHaveLength(2);
+  expect(cards[0].querySelector("h3")?.textContent).toBe("Cuộc họp tuần");
+  expect(cards[0].textContent).toContain("Chưa có mô tả dự án.");
+  expect(cards[0].textContent).toContain("Đang xử lý");
+  expect(cards[0].textContent).toContain("11/11/2026");
+  expect(cards[0].querySelector(".project-card-bottom > span:last-child")?.textContent).toBe("3 thành viên");
+  expect(cards[0].querySelector<HTMLElement>(".progress > span")?.style.width).toBe("42%");
+  const progress = cards[0].querySelector('[role="progressbar"]');
+  expect(progress?.getAttribute("aria-label")).toBe("Tiến độ Cuộc họp tuần");
+  expect(progress?.getAttribute("aria-valuenow")).toBe("42");
+  expect(cards[1].textContent).toContain("Nội dung đã xử lý");
+  expect(cards[1].textContent).toContain("Hoàn thành");
+  expect(cards[1].querySelector(".progress")).toBeNull();
+  expect(cards[1].querySelector(".file-icon.blue")).not.toBeNull();
+  await act(async () => cards[0].click());
+  expect(window.location.pathname).toBe("/projects/recent-project");
+  expect(host.querySelector("main h1")?.textContent).toBe("Dự án");
+  expect(host.querySelector("main")?.textContent).toContain("sẽ được bổ sung");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
+});
+
+it.each([
+  ["MEMBER", "Tạo dự án đầu tiên và thêm nội dung của bạn."],
+  ["VIEWER", "Dự án sẽ xuất hiện khi quản lý thêm bạn vào."],
+] as const)("shows the empty project guidance for %s", async (role, description) => {
+  fetchMock.mockResolvedValueOnce(Response.json({ ...session, user: { ...session.user, user_role_code: role } }));
+  await renderApp();
+  expect(host.querySelector(".empty h3")?.textContent).toBe("Chưa có dự án");
+  expect(host.querySelector(".empty p")?.textContent).toBe(description);
+  const link = host.querySelector<HTMLAnchorElement>('.empty a[href="/projects"]');
+  expect(link?.textContent).toBe("Đến dự án");
+  await act(async () => link!.click());
+  expect(host.querySelector("main h1")?.textContent).toBe("Dự án");
 });

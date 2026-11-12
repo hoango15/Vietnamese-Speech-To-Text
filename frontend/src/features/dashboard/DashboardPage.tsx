@@ -1,15 +1,18 @@
+import type { Project } from "../../shared/types";
+import { ProjectCards } from "../projects/components/ProjectCards";
 import { Link } from "react-router-dom";
 import { ArrowRight, AudioLines, Check, CheckCircle2, Clock3, FolderClosed } from "lucide-react";
 import { canCreateProject } from "../projects/lib/permissions";
 import { useResource } from "../../shared/hooks/useResource";
 import { bytes, time } from "../../shared/lib/format";
-import { ErrorBox, Loading, PageTitle } from "../../shared/ui/components";
+import { Empty, ErrorBox, Loading, PageTitle } from "../../shared/ui/components";
 import { useAuth } from "../auth/AuthProvider";
 import "./dashboard.css";
 
 export function DashboardPage() {
   const { user } = useAuth(),
     { data, error, loading, reload } = useResource<{
+      projects: Project[];
       stats: {
         projects: number;
         ready: number;
@@ -105,6 +108,36 @@ export function DashboardPage() {
           </div>
         ))}
       </div>
+        <section>
+          <div className="section-heading">
+            <div>
+              <h2>Dự án gần đây</h2>
+              <p>Tiếp tục công việc đang thực hiện</p>
+            </div>
+            <Link className="text-link" to="/projects">
+              Xem tất cả
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+          {data.projects.length ? (
+            <ProjectCards projects={data.projects} />
+          ) : (
+            <div className="card">
+              <Empty
+                title="Chưa có dự án"
+                description={
+                  canCreateProject(user?.user_role_code ?? "")
+                    ? "Tạo dự án đầu tiên và thêm nội dung của bạn."
+                    : "Dự án sẽ xuất hiện khi quản lý thêm bạn vào."
+                }
+              >
+                <Link className="button secondary" to="/projects">
+                  Đến dự án
+                </Link>
+              </Empty>
+            </div>
+          )}
+        </section>
     </>
   );
 }

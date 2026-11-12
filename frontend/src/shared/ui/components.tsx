@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AlertCircle, LoaderCircle } from "lucide-react";
+import { AlertCircle, FileAudio, FileImage, FileText, FileVideo, FolderOpen, LoaderCircle } from "lucide-react";
 
 export function Loading() {
   return (
@@ -59,6 +59,69 @@ export function PageTitle({
         <p>{subtitle}</p>
       </div>
       {children && <div className="heading-actions">{children}</div>}
+    </div>
+  );
+}
+
+export function Empty({
+  title = "Chưa có dữ liệu",
+  description = "Nội dung sẽ xuất hiện tại đây khi bạn bắt đầu làm việc.",
+  children,
+}: {
+  title?: string;
+  description?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="empty">
+      <div className="empty-icon">
+        <FolderOpen size={30} />
+      </div>
+      <h3>{title}</h3>
+      <p>{description}</p>
+      {children}
+    </div>
+  );
+}
+
+export const statusNames: Record<string, string> = {
+  DRAFT: "Bản nháp",
+  PROCESSING: "Đang xử lý",
+  READY: "Hoàn thành",
+  FAILED: "Thất bại",
+  QUEUED: "Đang chờ",
+  RUNNING: "Đang xử lý",
+  SUCCEEDED: "Hoàn thành",
+  CANCELED: "Đã hủy",
+};
+
+export function Status({ code }: { code: string }) {
+  return (
+    <span className={"status status-" + code.toLowerCase()}>
+      <i />
+      {statusNames[code] ?? code}
+    </span>
+  );
+}
+
+export function FileIcon({ kind }: { kind?: string }) {
+  const Icon = kind?.includes("IMAGE")
+    ? FileImage
+    : kind?.includes("VIDEO")
+      ? FileVideo
+      : kind && !kind.includes("AUDIO") ? FileText : FileAudio;
+  return (
+    <div
+      className={
+        "file-icon " +
+        (kind?.includes("IMAGE")
+          ? "purple"
+          : kind?.includes("VIDEO")
+            ? "blue"
+            : "")
+      }
+    >
+      <Icon size={21} />
     </div>
   );
 }
