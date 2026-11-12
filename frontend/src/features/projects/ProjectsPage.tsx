@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Pencil, Plus, Search } from "lucide-react";
 import { canCreateProject } from "./lib/permissions";
 import type { List, Project } from "../../shared/types";
 import {
@@ -26,7 +26,8 @@ import "./projects.css";
 export function ProjectsPage({ personal = false }: { personal?: boolean }) {
   const { user } = useAuth(),
     [params, setParams] = useSearchParams(),
-    [modal, setModal] = useState(false);
+    [modal, setModal] = useState(false),
+    [editing, setEditing] = useState<Project>();
   const q = params.get("q") ?? "",
     scope = personal ? "PERSONAL" : params.get("scope") ?? "",
     companyId = personal ? "" : params.get("company_id") ?? "",
@@ -126,6 +127,7 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
                 <th className="desktop-column">Trạng thái</th>
                 <th className="desktop-column">Người quản lý</th>
                 <th className="desktop-column">Cập nhật</th>
+                <th><span className="sr-only">Thao tác</span></th>
               </tr>
             </thead>
             <tbody>
@@ -163,6 +165,17 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
                     </div>
                   </td>
                   <td className="muted desktop-column">{date(project.updated_at)}</td>
+                  <td>
+                    {project.can_manage && (
+                      <button
+                        className="icon-button"
+                        aria-label={"Sửa " + project.project_title}
+                        onClick={() => setEditing(project)}
+                      >
+                        <Pencil size={17} />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -184,10 +197,14 @@ export function ProjectsPage({ personal = false }: { personal?: boolean }) {
           {page > 1 && <Pagination page={page} total={data?.total ?? 0} onChange={setPage} />}
         </div>
       )}
-      {modal && (
+      {(modal || editing) && (
         <ProjectForm
+          project={editing}
           initialScope={personal ? "PERSONAL" : undefined}
-          onClose={() => setModal(false)}
+          onClose={() => {
+            setModal(false);
+            setEditing(undefined);
+          }}
           onSaved={reload}
         />
       )}

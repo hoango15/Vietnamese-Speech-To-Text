@@ -192,3 +192,43 @@ it("blocks an empty required title before submitting a project", async () => {
   expect(mutations).toEqual([]);
   expect(document.querySelector("dialog")).not.toBeNull();
 });
+
+it("edits a managed project without changing its scope or company", async () => {
+  const saved: { method?: string; body: unknown }[] = [];
+  await mount("/projects", (url, options) => {
+    if (url === "/api/projects/project" && options.method === "PATCH") {
+      const body = JSON.parse(String(options.body)); saved.push({ method: options.method, body });
+      return Response.json({ ...project, ...body });
+    }
+    return Response.json({ items: [{ ...project, project_title: saved.length ? "Tên đã sửa" : project.project_title }], total: 1 });
+  });
+  const edit = host.querySelector<HTMLButtonElement>('[aria-label="Sửa Cuộc họp sản phẩm"]');
+  expect(edit).not.toBeNull();
+  await act(() => edit!.click());
+  expect(document.querySelector<HTMLInputElement>('[name="project_title"]')?.value).toBe(project.project_title);
+  expect(document.querySelector('[name="project_scope"]')).toBeNull();
+  await change(document.querySelector('[name="project_title"]')!, "Tên đã sửa");
+  await submitDialog();
+  expect(saved).toEqual([{ method: "PATCH", body: { project_title: "Tên đã sửa", project_description: project.project_description, language_code: "vi", project_type: "VIDEO" } }]);
+  expect(document.querySelector("dialog")).toBeNull();
+  expect(host.querySelector("tbody")?.textContent).toContain("Tên đã sửa");
+});
+
+it("hides editing for projects without management permission", async () => {
+  await mount("/projects", () => Response.json({ items: [{ ...project, can_manage: false, can_edit: false }], total: 1 }), { ...session.user, user_role_code: "VIEWER" });
+  expect(host.querySelector('[aria-label="Sửa Cuộc họp sản phẩm"]')).toBeNull();
+  expect([...host.querySelectorAll("button")].some(item => item.textContent?.trim() === "Tạo dự án")).toBe(false);
+});
+
+it("keeps edited values visible when saving a project fails", async () => {
+  await mount("/projects", (url, options) => options.method === "PATCH"
+    ? Response.json({ detail: "Không có quyền sửa dự án" }, { status: 403 })
+    : Response.json({ items: [project], total: 1 }));
+  const edit = host.querySelector<HTMLButtonElement>('[aria-label="Sửa Cuộc họp sản phẩm"]');
+  expect(edit).not.toBeNull();
+  await act(() => edit!.click());
+  await change(document.querySelector('[name="project_title"]')!, "Nội dung chưa lưu");
+  await submitDialog();
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain("Không có quyền sửa dự án");
+  expect(document.querySelector<HTMLInputElement>('[name="project_title"]')?.value).toBe("Nội dung chưa lưu");
+});
