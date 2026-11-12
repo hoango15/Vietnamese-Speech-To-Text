@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
 import { LoginPage } from "../features/auth/LoginPage";
+import { ProjectsPage } from "../features/projects/ProjectsPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { LogoutPage } from "../features/auth/LogoutPage";
 import { Loading } from "../shared/ui/components";
@@ -45,7 +46,9 @@ export default function App() {
         element: <WorkspaceLayout />,
         children: [
           { index: true, element: <DashboardPage /> },
-          ...workspaceSections.filter((section) => section.path !== "/").map((section) => ({
+          { path: "projects", element: <ProjectsPage /> },
+          { path: "my-projects", element: <ProjectsPage personal /> },
+          ...workspaceSections.filter((section) => !["/", "/my-projects"].includes(section.path)).map((section) => ({
             path: section.path === "/projects" ? "projects/*" : section.path.slice(1),
             element: <WorkspaceSection section={section} />,
           })),

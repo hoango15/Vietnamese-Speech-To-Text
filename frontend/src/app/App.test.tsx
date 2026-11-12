@@ -62,6 +62,8 @@ beforeEach(() => {
     if (url === "/api/auth/refresh")
       return Response.json({ detail: "Phiên đã hết hạn." }, { status: 401 });
     if (url === "/api/dashboard") return Response.json(dashboard);
+    if (url.startsWith("/api/projects?")) return Response.json({ items: [], total: 0 });
+    if (url.startsWith("/api/companies?")) return Response.json({ items: [], total: 0 });
     throw new Error(`Unexpected API call: ${url}`);
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -243,7 +245,7 @@ it.each([
   expect(link?.textContent).toBe(action);
   await act(async () => link!.click());
   expect(host.querySelector("main h1")?.textContent).toBe("Dự án");
-  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/projects?q=&status=&deleted=false&page=1&page_size=20");
 });
 
 it("logs out only after confirmation then allows another login", async () => {

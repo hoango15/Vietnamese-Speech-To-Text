@@ -45,3 +45,19 @@ export interface Audit {
   full_name?: string;
   change_detail?: unknown;
 }
+
+export interface Company {
+  company_id: string;
+  company_name: string;
+  owner_user_id: string;
+  owner_name: string;
+  owner_email: string;
+  member_count: number;
+  project_count: number;
+  created_at: string;
+}
+
+export interface List<T> {
+  items: T[];
+  total: number;
+}

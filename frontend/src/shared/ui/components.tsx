@@ -125,3 +125,42 @@ export function FileIcon({ kind }: { kind?: string }) {
     </div>
   );
 }
+
+export function MobileDetails({ children }: { children: ReactNode }) {
+  return <details className="mobile-row-details"><summary>Chi tiết</summary><dl>{children}</dl></details>;
+}
+
+
+export function Pagination({
+  page,
+  total,
+  onChange,
+}: {
+  page: number;
+  total: number;
+  onChange: (page: number) => void;
+}) {
+  return (
+    <div className="pagination">
+      <span>
+        {total} kết quả · Trang {page}/{Math.max(1, Math.ceil(total / 20))}
+      </span>
+      <div>
+        <button
+          className="button small secondary"
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+        >
+          Trước
+        </button>
+        <button
+          className="button small secondary"
+          disabled={page * 20 >= total}
+          onClick={() => onChange(page + 1)}
+        >
+          Sau
+        </button>
+      </div>
+    </div>
+  );
+}
