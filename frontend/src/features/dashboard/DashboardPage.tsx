@@ -1,10 +1,10 @@
-import type { Project } from "../../shared/types";
+import type { Audit, Project } from "../../shared/types";
 import { ProjectCards } from "../projects/components/ProjectCards";
 import { Link } from "react-router-dom";
-import { ArrowRight, AudioLines, Check, CheckCircle2, Clock3, FolderClosed } from "lucide-react";
+import { Activity, ArrowRight, AudioLines, Check, CheckCircle2, Clock3, FolderClosed } from "lucide-react";
 import { canCreateProject } from "../projects/lib/permissions";
 import { useResource } from "../../shared/hooks/useResource";
-import { bytes, time } from "../../shared/lib/format";
+import { bytes, date, time } from "../../shared/lib/format";
 import { Empty, ErrorBox, Loading, PageTitle } from "../../shared/ui/components";
 import { useAuth } from "../auth/AuthProvider";
 import "./dashboard.css";
@@ -13,6 +13,7 @@ export function DashboardPage() {
   const { user } = useAuth(),
     { data, error, loading, reload } = useResource<{
       projects: Project[];
+      activities: Audit[];
       stats: {
         projects: number;
         ready: number;
@@ -108,6 +109,7 @@ export function DashboardPage() {
           </div>
         ))}
       </div>
+      <div className="dashboard-columns">
         <section>
           <div className="section-heading">
             <div>
@@ -138,6 +140,33 @@ export function DashboardPage() {
             </div>
           )}
         </section>
+        <section className="activity-card card">
+          <div className="section-heading">
+            <h2>Hoạt động gần đây</h2>
+            <Activity size={18} />
+          </div>
+          {data.activities.length ? (
+            <ol className="activity-list">
+              {data.activities.slice(0, 7).map((entry) => (
+                <li className="activity-item" key={entry.audit_log_id}>
+                  <span className="activity-dot" />
+                  <div>
+                    <strong>{entry.full_name || "Hệ thống"}</strong>
+                    <p>
+                      {entry.action_name} · {entry.entity_name}
+                    </p>
+                    <small><time dateTime={entry.occurred_at}>{date(entry.occurred_at)}</time></small>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="muted activity-empty">
+              Chưa có hoạt động được ghi nhận.
+            </p>
+          )}
+        </section>
+      </div>
     </>
   );
 }

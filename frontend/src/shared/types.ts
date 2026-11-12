@@ -36,3 +36,12 @@ export interface Project {
   media_kind?: string;
   progress_percent?: number;
 }
+export interface Audit {
+  audit_log_id: string;
+  action_name: string;
+  entity_name: string;
+  entity_id: string;
+  occurred_at: string;
+  full_name?: string;
+  change_detail?: unknown;
+}

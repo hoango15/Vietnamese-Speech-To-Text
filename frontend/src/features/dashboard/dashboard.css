@@ -391,3 +391,90 @@
   .project-grid { grid-template-columns: 1fr; }
   .project-card { padding: 20px; }
 }
+
+.dashboard-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 24px;
+  align-items: start;
+}
+.dashboard-columns > section > .section-heading {
+  padding: 0 2px;
+}
+.dashboard-columns .section-heading h2 {
+  font-size: 15px;
+}
+.dashboard-columns .section-heading p {
+  font-size: 10px;
+}
+.dashboard-columns .text-link {
+  font-size: 10px;
+}
+.activity-card {
+  padding: 23px 20px;
+}
+.activity-card .section-heading {
+  margin-bottom: 27px;
+}
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+  padding-bottom: 24px;
+}
+.activity-item:not(:last-child):before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 3px;
+  bottom: 2px;
+  width: 1px;
+  background: #eaf0ef;
+}
+.activity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9ec6b8;
+  flex-shrink: 0;
+  margin-top: 5px;
+  position: relative;
+  box-shadow: 0 0 0 4px #f5faf8;
+}
+.activity-item strong {
+  font-size: 10px;
+  color: #607064;
+  font-weight: 550;
+}
+.activity-item p {
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.activity-item small {
+  font-size: 8px;
+  color: var(--muted);
+  display: block;
+  margin-top: 6px;
+}
+.activity-empty {
+  padding: 15px 0 25px;
+  font-size: 11px;
+}
+
+.activity-list { list-style: none; margin: 0; padding: 0; }
+.activity-item > div { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 1300px) {
+  .dashboard-columns { grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; }
+  .dashboard-columns .project-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 1000px) {
+  .dashboard-columns { grid-template-columns: 1fr; }
+  .dashboard-columns .project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .dashboard-columns .project-grid { grid-template-columns: 1fr; }
+  .dashboard-columns .section-heading h2 { font-size: 14px; }
+  .dashboard-columns .text-link { font-size: 10px; }
+}

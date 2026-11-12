@@ -285,6 +285,38 @@ it("returns to the requested protected URL after login", async () => {
   expect(host.querySelector("main h1")?.textContent).toBe("Dự án");
 });
 
+it("renders the seven latest activities and labels system events", async () => {
+  const activities = Array.from({ length: 8 }, (_, index) => ({
+    audit_log_id: `audit-${index}`,
+    action_name: index === 7 ? "Hoạt động cũ hơn" : "Cập nhật dự án",
+    entity_name: "Dự án",
+    entity_id: "recent-project",
+    occurred_at: "2026-11-11T12:00:00Z",
+    full_name: index === 0 ? "Trần Bình" : null,
+    change_detail: null,
+  }));
+  fetchMock.mockResolvedValueOnce(Response.json(session)).mockResolvedValueOnce(Response.json({
+    ...dashboard, activities,
+  }));
+  await renderApp();
+  const entries = host.querySelectorAll(".activity-list > li");
+  expect(entries).toHaveLength(7);
+  expect(entries[0].querySelector("strong")?.textContent).toBe("Trần Bình");
+  expect(entries[1].querySelector("strong")?.textContent).toBe("Hệ thống");
+  expect(entries[0].querySelector("p")?.textContent).toBe("Cập nhật dự án · Dự án");
+  expect(entries[0].querySelector("time")?.textContent).toBe("11/11/2026");
+  expect(entries[0].querySelector("time")?.getAttribute("datetime")).toBe("2026-11-11T12:00:00Z");
+  expect(host.querySelector(".activity-card")?.textContent).not.toContain("Hoạt động cũ hơn");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
+});
+
+it("shows an empty activity message when the API returns no events", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  expect(host.querySelector(".activity-empty")?.textContent).toContain("Chưa có hoạt động được ghi nhận.");
+  expect(host.querySelector(".activity-list")).toBeNull();
+});
+
 it("navigates between workspace sections and marks only the active sidebar link", async () => {
   fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
