@@ -1,6 +1,6 @@
-# Frontend Thanh Âm — xác thực và khung ứng dụng
+# Frontend Thanh Âm — xác thực, khung ứng dụng và Dashboard
 
-Giao diện xác thực và khung ứng dụng của Vietnamese Speech To Text, dùng React 19, TypeScript và Vite.
+Giao diện xác thực, khung ứng dụng và Dashboard của Vietnamese Speech To Text, dùng React 19, TypeScript và Vite.
 
 ## Chạy giao diện
 
@@ -24,15 +24,16 @@ npm run build
 - `src/features/auth/LoginPage.tsx`: form đăng nhập và đăng ký, kiểm tra mật khẩu xác nhận, gọi API, thông báo thành công và lỗi.
 - `src/features/auth/AuthProvider.tsx`: khôi phục và quản lý phiên đăng nhập.
 - `src/features/auth/LogoutPage.tsx`: kết thúc phiên để có thể đăng nhập tài khoản khác.
+- `src/features/dashboard/DashboardPage.tsx`: trang tổng quan, lời chào theo tài khoản và liên kết dự án theo vai trò.
 - `src/shared/`: API client, kiểu dữ liệu, hook tác vụ, thông báo và CSS dùng chung từ dự án gốc.
 - `src/app/layouts/WorkspaceLayout.tsx`: sidebar, header, footer, menu di động và chặn truy cập khi chưa đăng nhập.
 - `src/app/layouts/navigation.ts`: khai báo đường dẫn và nhãn điều hướng dùng chung cho sidebar, header và router.
 - `src/app/layouts/workspace.css`: CSS khung ứng dụng và menu responsive, trích riêng từ giao diện gốc.
 - `src/app/App.tsx`: router các trang xác thực, nội dung trong khung ứng dụng và trang không tìm thấy.
 
-Mã giao diện được trích từ dự án cục bộ. CSS, component và kiểu dữ liệu chỉ gồm phần xác thực và khung ứng dụng, giữ các breakpoint responsive và hỗ trợ giảm chuyển động.
+Mã giao diện được trích từ dự án cục bộ. CSS, component và kiểu dữ liệu gồm xác thực, khung ứng dụng và các phần Dashboard đã hoàn thành, giữ responsive và hỗ trợ giảm chuyển động.
 
-Sau đăng nhập, khung hiển thị tên và email tài khoản. Các mục dự án, thư viện, kho tệp, từ điển, thanh toán, hồ sơ, thông báo và cài đặt đã có đường dẫn, nhưng hiện chỉ hiển thị thông báo màn hình sẽ được bổ sung. Ô tìm kiếm trên header chuyển tới `/search?q=...`; chưa tải kết quả tìm kiếm. Chưa kèm Dashboard, tác vụ xử lý hay nghiệp vụ của các mục này; khung không gọi API tính năng và không hiển thị thống kê hoặc thông báo giả.
+Sau đăng nhập, trang tổng quan hiển thị lời chào và nút đến dự án theo vai trò; khung hiển thị tên và email tài khoản. Các mục dự án, thư viện, kho tệp, từ điển, thanh toán, hồ sơ, thông báo và cài đặt đã có đường dẫn, nhưng hiện chỉ hiển thị thông báo màn hình sẽ được bổ sung. Ô tìm kiếm trên header chuyển tới `/search?q=...`; chưa tải kết quả tìm kiếm. Dashboard chưa tải thống kê, dự án hoặc hoạt động. Chưa kèm tác vụ xử lý hay nghiệp vụ của các mục này; khung không gọi API tính năng và không hiển thị thống kê hoặc thông báo giả.
 
 Nếu mở đường dẫn được bảo vệ khi chưa đăng nhập, ứng dụng chuyển tới `/login` và trở lại đúng đường dẫn, tham số và phần neo sau khi xác thực. Liên kết quản trị chỉ hiện theo vai trò; đường dẫn quản trị không phù hợp hiển thị từ chối truy cập. Đây là kiểm soát giao diện; API vẫn phải kiểm tra quyền ở máy chủ.
 

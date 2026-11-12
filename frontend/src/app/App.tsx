@@ -6,25 +6,12 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
 import { LoginPage } from "../features/auth/LoginPage";
+import { DashboardPage } from "../features/dashboard/DashboardPage";
 import { LogoutPage } from "../features/auth/LogoutPage";
 import { Loading } from "../shared/ui/components";
 import { NoticeProvider } from "../shared/ui/NoticeProvider";
 import { WorkspaceLayout } from "./layouts/WorkspaceLayout";
 import { workspaceSections, type WorkspaceDestination } from "./layouts/navigation";
-
-function AccountPage() {
-  const { user } = useAuth();
-  if (!user) return null;
-
-  return (
-    <section className="card panel stack">
-      <h1>Không gian làm việc</h1>
-      <p>Xin chào, {user.full_name}.</p>
-      <p>{user.email}</p>
-      <Link className="button" to="/profile">Hồ sơ của tôi</Link>
-    </section>
-  );
-}
 
 function WorkspaceSection({ section }: { section: WorkspaceDestination }) {
   const { user } = useAuth();
@@ -57,7 +44,7 @@ export default function App() {
       {
         element: <WorkspaceLayout />,
         children: [
-          { index: true, element: <AccountPage /> },
+          { index: true, element: <DashboardPage /> },
           ...workspaceSections.filter((section) => section.path !== "/").map((section) => ({
             path: section.path.slice(1),
             element: <WorkspaceSection section={section} />,

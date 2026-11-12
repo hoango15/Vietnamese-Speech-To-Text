@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AlertCircle, LoaderCircle } from "lucide-react";
 
 export function Loading() {
@@ -38,6 +39,26 @@ export function ErrorBox({
           Thử lại
         </button>
       )}
+    </div>
+  );
+}
+
+export function PageTitle({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="page-heading">
+      <div>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
+      </div>
+      {children && <div className="heading-actions">{children}</div>}
     </div>
   );
 }

@@ -173,7 +173,8 @@ it("logs in through the API and shows the signed-in account", async () => {
   expect(url).toBe("/api/auth/login");
   expect(options.method).toBe("POST");
   expect(JSON.parse(options.body as string)).toEqual({ email: session.user.email, password: "TestPassword123" });
-  expect(host.querySelector("main")?.textContent).toContain(session.user.full_name);
+  expect(host.querySelector("main h1")?.textContent).toBe("Tổng quan");
+  expect(host.querySelector("main")?.textContent).toContain("Xin chào, An!");
   expect(host.textContent).toContain(session.user.full_name);
   expect(window.location.pathname).toBe("/");
 });
@@ -195,6 +196,24 @@ it("restores an existing session without displaying the login form", async () =>
   expect(host.textContent).toContain(session.user.email);
   expect(host.querySelector(".auth-form")).toBeNull();
   expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  ["ADMIN", "Bắt đầu một dự án"],
+  ["COMPANY_OWNER", "Bắt đầu một dự án"],
+  ["MEMBER", "Bắt đầu một dự án"],
+  ["MANAGER", "Khám phá dự án"],
+  ["VIEWER", "Khám phá dự án"],
+] as const)("opens Dashboard with the correct project action for %s", async (role, action) => {
+  fetchMock.mockResolvedValueOnce(Response.json({ ...session, user: { ...session.user, user_role_code: role } }));
+  await renderApp();
+  expect(host.querySelector("main h1")?.textContent).toBe("Tổng quan");
+  expect(host.querySelector(".welcome-banner h2")?.textContent).toBe("Xin chào, An!");
+  const link = host.querySelector<HTMLAnchorElement>('.welcome-banner a[href="/projects"]');
+  expect(link?.textContent).toBe(action);
+  await act(async () => link!.click());
+  expect(host.querySelector("main h1")?.textContent).toBe("Dự án");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh"]);
 });
 
 it("logs out only after confirmation then allows another login", async () => {
