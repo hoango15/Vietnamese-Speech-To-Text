@@ -74,6 +74,108 @@ export interface Media {
   is_current: boolean;
 }
 
+export interface Job {
+  job_id: string;
+  job_kind?: string;
+  project_id: string;
+  media_file_id: string;
+  file_name?: string;
+  requested_exports?: string[];
+  job_status_code: string;
+  progress_percent: number;
+  error_message: string | null;
+  created_at: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  asr_model_name?: string;
+  asr_progress?: { processed_audio_ms: number; total_audio_ms: number } | null;
+  stages?: {
+    job_stage_type_code: string;
+    stage_status_code: string;
+    error_message?: string;
+  }[];
+}
+
+export interface Segment {
+  segment_id?: string;
+  segment_no?: number;
+  start_ms: number;
+  end_ms: number;
+  segment_text: string;
+  speaker_id?: string | null;
+  confidence_score?: number;
+}
+
+export interface Speaker {
+  media_file_id?: string | null;
+  speaker_id: string;
+  speaker_label: string;
+  display_name: string;
+  color_hex: string;
+}
+
+export interface Transcript {
+  media_file_id?: string | null;
+  transcript_id: string;
+  project_id: string;
+  version_no: number;
+  revision: number;
+  segments: Segment[];
+  speakers: Speaker[];
+}
+
+export interface Minutes {
+  media_file_id?: string | null;
+  minutes_id: string;
+  project_id: string;
+  project_title?: string;
+  meeting_title: string;
+  meeting_date: string | null;
+  summary_text: string;
+  version_no: number;
+  llm_model_name: string;
+  topics: {
+    topic_title: string;
+    topic_summary: string;
+    source_start_ms?: number | null;
+  }[];
+  decisions: { decision_text: string; source_start_ms?: number | null }[];
+  action_items: {
+    item_description: string;
+    assignee_name?: string;
+    due_date?: string | null;
+    action_item_status_code: string;
+    source_start_ms?: number | null;
+  }[];
+  created_at: string;
+}
+
+export interface ExportFile {
+  media_file_id?: string | null;
+  export_file_id: string;
+  transcript_id?: string | null;
+  project_id: string;
+  project_title?: string;
+  export_kind_code: string;
+  file_name: string;
+  file_size_bytes: number;
+  source: string;
+  created_at: string;
+  is_stale?: boolean;
+}
+
+export interface FileRecord {
+  media_file_id?: string | null;
+  id: string;
+  project_id: string;
+  project_title: string;
+  file_name: string;
+  kind: string;
+  size: number;
+  created_at: string;
+  download_url: string;
+}
+
 export interface Capabilities {
   asr: boolean;
   ocr: boolean;
