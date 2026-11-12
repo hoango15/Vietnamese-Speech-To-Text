@@ -20,7 +20,8 @@ async function mount(handler: (url: string, options: RequestInit) => Response | 
   api.setSession(null);
   window.history.replaceState(null, "", "/projects/p1");
   vi.stubGlobal("fetch", (url: string, options: RequestInit = {}) => Promise.resolve(url === "/api/auth/refresh"
-    ? Response.json(session) : url === "/api/projects/p1" ? Response.json({ ...project, ...details }) : handler(url, options)));
+    ? Response.json(session) : url === "/api/projects/p1" ? Response.json({ ...project, ...details })
+    : url.endsWith("/playback") ? Response.json({ url: url.replace(/\/playback$/, "/stream"), expires_in: 300 }) : handler(url, options)));
   host = document.createElement("div"); document.body.append(host);
   root = createRoot(host);
   await act(async () => root!.render(<App />));
