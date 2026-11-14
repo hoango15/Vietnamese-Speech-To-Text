@@ -78,3 +78,57 @@ def uploads(q: str = '', status: UploadStatus | None = None, page: int = 1, page
         return {'items': rows, 'total': total}
 
 
+@router.get('/audit')
+def logs(q: str = '', entity: str = '', action: str = '', page: int = 1, page_size: int = 20, user=Depends(admin)):
+    limit, offset = pagination(page, page_size)
+    where = 'u.organization_id=%s AND (u.full_name ILIKE %s OR a.action_name ILIKE %s OR a.entity_id ILIKE %s OR a.entity_name ILIKE %s)'
+    params = [user['organization_id'], *(['%' + q[:200] + '%'] * 4)]
+    if entity:
+        where += ' AND a.entity_name=%s'; params.append(entity[:100])
+    if action:
+        where += ' AND a.action_name=%s'; params.append(action[:50])
+    source = ' FROM audit_log a JOIN app_user u USING(user_id) WHERE ' + where
+    with connection() as conn:
+        total = one(conn, 'SELECT count(*) AS n' + source, params)['n']
+        rows = all_rows(conn, 'SELECT a.*,u.full_name' + source + ' ORDER BY a.occurred_at DESC,a.audit_log_id DESC LIMIT %s OFFSET %s', (*params, limit, offset))
+        return {'items': rows, 'total': total}
+
+
+@router.get('/system')
+def system(user=Depends(admin)):
+    import psycopg
+    import redis
+    from celery import Celery
+    from ..services.processors import capabilities
+    services = {'api': {'status': 'ok'}}
+    try:
+        with psycopg.connect(config.DATABASE_URL, connect_timeout=2) as conn:
+            conn.execute("SET statement_timeout='2s'")
+            conn.execute('SELECT 1')
+        services['database'] = {'status': 'ok'}
+    except psycopg.Error:
+        services['database'] = {'status': 'error', 'detail': 'Không kết nối được cơ sở dữ liệu.'}
+    try:
+        with redis.Redis.from_url(config.REDIS_URL, socket_connect_timeout=1, socket_timeout=1) as client:
+            client.ping()
+        services['redis'] = {'status': 'ok'}
+    except (redis.RedisError, ValueError):
+        services['redis'] = {'status': 'error', 'detail': 'Không kết nối được hàng đợi Redis.'}
+    if services['redis']['status'] == 'ok':
+        try:
+            with Celery('admin-health', broker=config.REDIS_URL, broker_connection_timeout=1,
+                        broker_transport_options={'socket_connect_timeout': 1, 'socket_timeout': 1, 'max_retries': 0}) as app:
+                replies = app.control.ping(timeout=1)
+            services['worker'] = {'status': 'ok' if replies else 'error', 'responding_workers': len(replies)}
+        except Exception:
+            services['worker'] = {'status': 'error', 'detail': 'Worker chưa phản hồi.'}
+    else:
+        services['worker'] = {'status': 'unknown', 'detail': 'Cần Redis để kiểm tra worker.'}
+    try:
+        with tempfile.TemporaryFile(dir=config.STORAGE_ROOT) as file:
+            file.write(b'health'); file.flush()
+        disk = shutil.disk_usage(config.STORAGE_ROOT)
+        services['storage'] = {'status': 'ok', 'free_bytes': disk.free, 'total_bytes': disk.total}
+    except OSError:
+        services['storage'] = {'status': 'error', 'detail': 'Không ghi được vào kho tệp.'}
+    return {'services': services, 'capabilities': {**capabilities(), 'max_upload_bytes': config.MAX_UPLOAD_BYTES}}
