@@ -45,3 +45,36 @@ def overview(user=Depends(admin)):
     return {'stats': stats, 'job_statuses': statuses, 'daily_jobs': daily, 'time_zone': 'UTC', 'activities': activities}
 
 
+@router.get('/jobs')
+def jobs(q: str = '', status: JobStatus | None = None, kind: JobKind | None = None,
+         page: int = 1, page_size: int = 20, user=Depends(admin)):
+    limit, offset = pagination(page, page_size)
+    where = 'p.organization_id=%s AND p.deleted_at IS NULL AND (p.project_title ILIKE %s OR j.job_id::text ILIKE %s)'
+    params = [user['organization_id'], '%' + q[:200] + '%', '%' + q[:200] + '%']
+    if status:
+        where += ' AND j.job_status_code=%s'; params.append(status)
+    if kind:
+        where += ' AND j.job_kind=%s'; params.append(kind)
+    source = ' FROM processing_job j JOIN project p USING(project_id) WHERE ' + where
+    with connection() as conn:
+        total = one(conn, 'SELECT count(*) AS n' + source, params)['n']
+        rows = all_rows(conn, 'SELECT j.*,p.project_title' + source + ' ORDER BY j.created_at DESC,j.job_id LIMIT %s OFFSET %s', (*params, limit, offset))
+        return {'items': [job_data(conn, row) for row in rows], 'total': total}
+
+
+@router.get('/uploads')
+def uploads(q: str = '', status: UploadStatus | None = None, page: int = 1, page_size: int = 20, user=Depends(admin)):
+    limit, offset = pagination(page, page_size)
+    where = 'p.organization_id=%s AND p.deleted_at IS NULL AND (p.project_title ILIKE %s OR s.file_name ILIKE %s)'
+    params = [user['organization_id'], '%' + q[:200] + '%', '%' + q[:200] + '%']
+    if status:
+        where += ' AND s.upload_status_code=%s'; params.append(status)
+    source = ' FROM upload_session s JOIN project p USING(project_id) JOIN app_user u ON u.user_id=s.user_id WHERE ' + where
+    with connection() as conn:
+        total = one(conn, 'SELECT count(*) AS n' + source, params)['n']
+        rows = all_rows(conn, '''SELECT s.upload_id,s.project_id,s.file_name,s.upload_status_code,s.expected_size_bytes,
+            s.uploaded_size_bytes,s.created_at,s.expires_at,p.project_title,u.full_name''' + source +
+            ' ORDER BY s.created_at DESC,s.upload_id LIMIT %s OFFSET %s', (*params, limit, offset))
+        return {'items': rows, 'total': total}
+
+
