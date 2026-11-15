@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { History, Play } from "lucide-react";
 import { api } from "../../../shared/api/client";
@@ -6,7 +6,33 @@ import type { Capabilities, Job, List, Media, Project } from "../../../shared/ty
 import { ErrorBox } from "../../../shared/ui/components";
 import { useAction } from "../../../shared/hooks/useAction";
 import { useResource } from "../../../shared/hooks/useResource";
+import { message } from "../../../shared/lib/errors";
 import { JobCard } from "../jobs/JobCard";
+
+function useActiveJobs(projectId: string) {
+  const [version, setVersion] = useState(0);
+  const [state, setState] = useState({ projectId, data: [] as Job[], loading: true, error: "" });
+  useEffect(() => {
+    const controller = new AbortController();
+    setState(old => ({ projectId, data: old.projectId === projectId ? old.data : [], loading: true, error: "" }));
+    Promise.all(["QUEUED", "RUNNING"].map(async status => {
+      const jobs: Job[] = [];
+      for (let page = 1; !controller.signal.aborted; page++) {
+        const result = await api.request<List<Job>>(`/projects/${projectId}/jobs?status=${status}&page=${page}&page_size=20`, { signal: controller.signal });
+        jobs.push(...result.items);
+        if (!result.items.length || page * 20 >= result.total) break;
+      }
+      return jobs;
+    })).then(pages => {
+      if (!controller.signal.aborted) setState({ projectId, data: pages.flat(), loading: false, error: "" });
+    }).catch(error => {
+      if (!controller.signal.aborted) setState({ projectId, data: [], loading: false, error: message(error) });
+    });
+    return () => controller.abort();
+  }, [projectId, version]);
+  const current = state.projectId === projectId ? state : { data: [], loading: true, error: "" };
+  return { ...current, reload: () => setVersion(value => value + 1) };
+}
 
 export function ProcessPanel({ project, media, onComplete, disabled = false }: {
   project: Project;
@@ -20,7 +46,7 @@ export function ProcessPanel({ project, media, onComplete, disabled = false }: {
   if (media) historyParams.set("media", media.media_file_id);
   else historyParams.delete("media");
   const capabilities = useResource<Capabilities>("/system/capabilities"),
-    jobs = useResource<List<Job>>(`/projects/${project.project_id}/jobs`),
+    jobs = useActiveJobs(project.project_id),
     glossaries = useResource<List<{ glossary_id: string; glossary_name: string }>>("/glossaries?page_size=100"),
     [glossary, setGlossary] = useState(""),
     [minutes, setMinutes] = useState(false),
@@ -32,8 +58,9 @@ export function ProcessPanel({ project, media, onComplete, disabled = false }: {
   const image = media?.media_kind_code === "ORIGINAL_IMAGE",
     separateSpeakers = !image && diarization && !!capabilities.data?.diarization,
     supported = image ? capabilities.data?.ocr : capabilities.data?.asr,
-    currentJob = lastJob?.media_file_id === media?.media_file_id ? lastJob :
-      jobs.data?.items.find(job => job.media_file_id === media?.media_file_id && ["QUEUED", "RUNNING"].includes(job.job_status_code)),
+    localJob = lastJob?.project_id === project.project_id && lastJob?.media_file_id === media?.media_file_id ? lastJob : null,
+    currentJob = localJob && ["QUEUED", "RUNNING"].includes(localJob.job_status_code) ? localJob :
+      jobs.data.find(job => job.media_file_id === media?.media_file_id && job.job_id !== localJob?.job_id) ?? localJob,
     active = !!currentJob && ["QUEUED", "RUNNING"].includes(currentJob.job_status_code);
   return <section className="processing-card" aria-label="Xử lý nội dung">
     <div className="section-heading"><h3>Xử lý nội dung</h3><span className="badge">{image ? "OCR" : "ASR"}</span></div>

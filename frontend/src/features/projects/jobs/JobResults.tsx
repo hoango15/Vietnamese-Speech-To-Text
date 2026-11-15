@@ -50,7 +50,7 @@ export function JobResults({ job, onClose }: { job: Job; onClose: () => void }) 
       {value.exports.length ? <><h3>Tệp kết quả của tác vụ</h3>{value.exports.map(file => <button key={file.export_file_id}
         className="button secondary small" disabled={action.busy} onClick={() => action.run(() =>
           api.download(`/exports/${file.export_file_id}/download`, file.file_name))}>{file.export_kind_code} · {file.file_name}</button>)}</>
-        : <Empty title="Chưa xuất tệp" description="Mở tab Phụ đề & xuất tệp để tạo kết quả từ nội dung đã lưu." />}
+        : <Empty title="Chưa xuất tệp" description="Tác vụ này chưa có tệp kết quả để tải xuống." />}
     </div> : null}
   </Modal>;
 }
