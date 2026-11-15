@@ -6,3 +6,8 @@
 .job-timing, .job-progress-hint { color: var(--muted); font-size: 12px; }
 .job-stages { display: grid; gap: 8px; }
 .job-stages .danger { flex-basis: 100%; }
+.jobs-panel { display: grid; gap: 16px; }
+.jobs-panel .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+.jobs-panel .toolbar input { flex: 1; min-width: 160px; }
+.project-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.project-tabs [aria-pressed="true"] { color: var(--teal); border-color: var(--teal); }

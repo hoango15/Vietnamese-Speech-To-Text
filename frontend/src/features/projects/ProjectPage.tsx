@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useBlocker, useParams } from "react-router-dom";
+import { Link, useBlocker, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Clock3, Users } from "lucide-react";
 import type { List, Media, Project } from "../../shared/types";
 import { date } from "../../shared/lib/format";
@@ -7,10 +7,18 @@ import { Empty, ErrorBox, Loading, PageTitle, Status } from "../../shared/ui/com
 import { useResource } from "../../shared/hooks/useResource";
 import { MediaPanel } from "./media/MediaPanel";
 import { UploadPanel } from "./media/UploadPanel";
+import { JobsPanel } from "./jobs/JobsPanel";
 import "./media/media.css";
 
 export default function ProjectPage() {
   const { id } = useParams();
+  const [params, setParams] = useSearchParams();
+  const history = params.get("tab") === "jobs";
+  const changeTab = (tab: string) => setParams(current => {
+    const next = new URLSearchParams(current);
+    next.set("tab", tab);
+    return next;
+  });
   const [sourceBusy, setSourceBusy] = useState(false);
   const [recordingDirty, setRecordingDirty] = useState(false);
   const blocker = useBlocker(recordingDirty);
@@ -42,10 +50,14 @@ export default function ProjectPage() {
         <span><Clock3 size={15} />Cập nhật {date(p.updated_at)}</span>
         <span>Người quản lý: {p.owner_name}</span>
       </div>
-      <div className="project-media-layout">
+      <nav className="project-tabs" aria-label="Màn hình dự án">
+        <button className="button secondary" aria-pressed={!history} disabled={sourceBusy || recordingDirty} onClick={() => changeTab("content")}>Tệp nguồn</button>
+        <button className="button secondary" aria-pressed={history} disabled={sourceBusy || recordingDirty} onClick={() => changeTab("jobs")}>Lịch sử xử lý</button>
+      </nav>
+      {history ? <JobsPanel key={p.project_id} project={p} /> : <div className="project-media-layout">
         <MediaPanel key={p.project_id} project={p} media={media.data?.items ?? []} loading={media.loading} error={media.error} reload={media.reload} disabled={sourceBusy || recordingDirty} />
         {p.can_edit && <UploadPanel key={p.project_id + ":upload"} project={p} onComplete={media.reload} canChangeSource={() => true} onUploading={setSourceBusy} onRecordingDirty={setRecordingDirty} />}
-      </div>
+      </div>}
     </>}
   </>;
 }

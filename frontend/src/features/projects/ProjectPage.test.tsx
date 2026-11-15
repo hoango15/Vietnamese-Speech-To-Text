@@ -17,9 +17,9 @@ const media = { media_file_id: "m1", project_id: "p1", media_kind_code: "ORIGINA
 const session: Session = { access_token: "token", user: { user_id: "owner", email: "owner@example.test", full_name: "Chủ dự án", user_role_code: "MANAGER", is_active: true, created_at: project.created_at } };
 let root: ReturnType<typeof createRoot> | undefined;
 let host: HTMLDivElement;
-async function mount(handler: (url: string, options: RequestInit) => Response | Promise<Response> = () => Response.json({ items: [media], total: 1 }), details: Partial<Project> = {}) {
+async function mount(handler: (url: string, options: RequestInit) => Response | Promise<Response> = () => Response.json({ items: [media], total: 1 }), details: Partial<Project> = {}, path = "/projects/p1") {
   api.setSession(null);
-  window.history.replaceState(null, "", "/projects/p1");
+  window.history.replaceState(null, "", path);
   vi.stubGlobal("fetch", (url: string, options: RequestInit = {}) => Promise.resolve(url === "/api/auth/refresh"
     ? Response.json(session) : url === "/api/projects/p1" ? Response.json({ ...project, ...details })
     : url.endsWith("/playback") ? Response.json({ url: url.replace(/\/playback$/, "/stream"), expires_in: 300 }) : handler(url, options)));
@@ -38,6 +38,22 @@ it("opens project files from the protected detail route with size and duration",
   expect(host.querySelector(".media-info")?.textContent).toContain("hop.wav");
   expect(host.querySelector(".media-info")?.textContent).toContain("2.0 KB");
   expect(host.querySelector(".media-info")?.textContent).toContain("00:01:05");
+});
+
+it("opens processing history without discarding the selected media or filters", async () => {
+  const requests: string[] = [];
+  await mount(url => {
+    requests.push(url);
+    return Response.json({ items: url.includes("/jobs?") ? [] : [media], total: 0 });
+  }, {}, "/projects/p1?media=m1&jobs_q=hop.wav");
+  const history = [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Lịch sử xử lý");
+  expect(history).toBeDefined();
+  await act(() => history!.click());
+  expect(window.location.search).toContain("tab=jobs");
+  expect(window.location.search).toContain("media=m1");
+  expect(window.location.search).toContain("jobs_q=hop.wav");
+  expect(host.querySelector("h2")?.textContent).toBe("Lịch sử xử lý");
+  expect(requests).toContain("/api/projects/p1/jobs?q=hop.wav&page=1&page_size=20");
 });
 
 it("switches original files and displays the selected file's duration", async () => {
