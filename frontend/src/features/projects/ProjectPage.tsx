@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useBlocker, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Clock3, Users } from "lucide-react";
 import type { List, Media, Project } from "../../shared/types";
@@ -35,6 +35,7 @@ export default function ProjectPage() {
   }, [recordingDirty]);
   const project = useResource<Project>("/projects/" + id);
   const media = useResource<List<Media>>(project.data && !project.data.deleted_at ? `/projects/${id}/media` : null);
+  const processingComplete = useCallback(() => { project.reload(); media.reload(); }, [project.reload, media.reload]);
   if (project.loading && !project.data) return <Loading />;
   if (project.error) return <ErrorBox error={project.error} retry={project.reload} />;
   const p = project.data;
@@ -55,7 +56,7 @@ export default function ProjectPage() {
         <button className="button secondary" aria-pressed={history} disabled={sourceBusy || recordingDirty} onClick={() => changeTab("jobs")}>Lịch sử xử lý</button>
       </nav>
       {history ? <JobsPanel key={p.project_id} project={p} /> : <div className="project-media-layout">
-        <MediaPanel key={p.project_id} project={p} media={media.data?.items ?? []} loading={media.loading} error={media.error} reload={media.reload} disabled={sourceBusy || recordingDirty} />
+        <MediaPanel key={p.project_id} project={p} media={media.data?.items ?? []} loading={media.loading} error={media.error} reload={media.reload} disabled={sourceBusy || recordingDirty} onProcessed={processingComplete} />
         {p.can_edit && <UploadPanel key={p.project_id + ":upload"} project={p} onComplete={media.reload} canChangeSource={() => true} onUploading={setSourceBusy} onRecordingDirty={setRecordingDirty} />}
       </div>}
     </>}

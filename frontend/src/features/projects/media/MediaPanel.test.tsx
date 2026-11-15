@@ -79,10 +79,11 @@ it("aborts the previous source download on selection changes and the current dow
 });
 
 it("rejects playback URLs outside the selected media stream", async () => {
-  vi.stubGlobal("fetch", async () => Response.json({ url: "https://foreign.example/stream", expires_in: 300 }));
+  vi.stubGlobal("fetch", async (url: string) => Response.json(url.endsWith("/playback")
+    ? { url: "https://foreign.example/stream", expires_in: 300 } : { items: [], total: 0 }));
   const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   const media: Media = { media_file_id: "m1", project_id: "p1", media_kind_code: "ORIGINAL_VIDEO", is_current: true, mime_type: "video/mp4", file_name: "clip.mp4", file_size_bytes: 1024, duration_ms: 10000, created_at: "2026-11-12" };
-  await act(() => root.render(<MediaPanel project={{ language_code: "vi" } as Project} media={[media]} loading={false} error="" reload={() => {}} />));
+  await act(() => root.render(<MemoryRouter><MediaPanel project={{ project_id: "p1", language_code: "vi", can_edit: false } as Project} media={[media]} loading={false} error="" reload={() => {}} /></MemoryRouter>));
   expect(host.querySelector("video")).toBeNull();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain("Đường dẫn phát media không hợp lệ");
 });
@@ -94,7 +95,7 @@ it("previews images and releases their object URLs on selection changes and unmo
   const revoke = vi.spyOn(URL, "revokeObjectURL");
   const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   const media: Media[] = ["m1", "m2"].map((id, index) => ({ media_file_id: id, project_id: "p1", media_kind_code: "ORIGINAL_IMAGE", is_current: index === 0, mime_type: "image/png", file_name: id + ".png", file_size_bytes: 10, duration_ms: 0, created_at: "2026-11-12" }));
-  await act(() => root.render(<MediaPanel project={{ language_code: "vi" } as Project} media={media} loading={false} error="" reload={() => {}} />));
+  await act(() => root.render(<MemoryRouter><MediaPanel project={{ project_id: "p1", language_code: "vi", can_edit: false } as Project} media={media} loading={false} error="" reload={() => {}} /></MemoryRouter>));
   expect(host.querySelector("img")?.getAttribute("alt")).toBe("m1.png");
   const select = host.querySelector<HTMLSelectElement>("select")!;
   await act(() => { select.value = "m2"; select.dispatchEvent(new Event("change", { bubbles: true })); });

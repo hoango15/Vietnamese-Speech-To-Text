@@ -1,21 +1,25 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Play, RotateCw, UploadCloud } from "lucide-react";
 import { api } from "../../../shared/api/client";
 import { message } from "../../../shared/lib/errors";
 import type { Media, Project } from "../../../shared/types";
 import { bytes, date, time } from "../../../shared/lib/format";
 import { ErrorBox, Loading } from "../../../shared/ui/components";
+import { ProcessPanel } from "./ProcessPanel";
 
-export function MediaPanel({ project, media, loading, error, reload, disabled = false }: {
+export function MediaPanel({ project, media, loading, error, reload, disabled = false, onProcessed }: {
   project: Project;
   media: Media[];
   loading: boolean;
   error: string;
   reload: () => void;
   disabled?: boolean;
+  onProcessed?: () => void;
 }) {
-  const [selected, setSelected] = useState(""),
-    [source, setSource] = useState<{ id: string; url: string } | null>(null),
+  const [params, setParams] = useSearchParams();
+  const selected = params.get("media") ?? "";
+  const [source, setSource] = useState<{ id: string; url: string } | null>(null),
     [blobLoading, setBlobLoading] = useState(false),
     [blobError, setBlobError] = useState(""),
     [attempt, setAttempt] = useState(0),
@@ -66,7 +70,10 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
     {loading ? <Loading /> : error ? <ErrorBox error={error} retry={reload} /> : !current ? <div className="source-empty">
       <UploadCloud size={32} /><p>Thêm tệp để bắt đầu</p><small>Video, âm thanh hoặc hình ảnh</small>
     </div> : <>
-      <select className="media-select" aria-label="Chọn tệp xem trước" disabled={disabled} value={current.media_file_id} onChange={event => setSelected(event.target.value)}>
+      <select className="media-select" aria-label="Chọn tệp xem trước" disabled={disabled} value={current.media_file_id} onChange={event => {
+        const id = event.target.value;
+        setParams(previous => { const next = new URLSearchParams(previous); next.set("media", id); return next; });
+      }}>
         {sources.map(item => <option value={item.media_file_id} key={item.media_file_id}>{item.file_name}</option>)}
       </select>
             {blobLoading ? (
@@ -121,6 +128,7 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
           {" · " + date(current.created_at)}
         </small>
       </div>
+      <ProcessPanel key={current.media_file_id} project={project} media={current} disabled={disabled} onComplete={onProcessed ?? reload} />
     </>}
   </div>;
 }

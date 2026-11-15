@@ -1,6 +1,6 @@
-# Frontend Thanh Âm — xác thực, khung ứng dụng và Dashboard
+# Frontend Thanh Âm
 
-Giao diện xác thực, khung ứng dụng và Dashboard của Vietnamese Speech To Text, dùng React 19, TypeScript và Vite.
+Giao diện Vietnamese Speech To Text, dùng React 19, TypeScript và Vite: xác thực, Dashboard, dự án, tệp nguồn, theo dõi xử lý, phụ đề, thư viện và kho tệp.
 
 ## Chạy giao diện
 
@@ -16,6 +16,7 @@ Mở `http://localhost:5173/login`. Bấm **Đăng ký** để chuyển sang for
 
 ```sh
 npm test
+npm run typecheck
 npm run build
 ```
 
@@ -26,6 +27,11 @@ npm run build
 - `src/features/auth/LogoutPage.tsx`: kết thúc phiên để có thể đăng nhập tài khoản khác.
 - `src/features/dashboard/DashboardPage.tsx`: lời chào, bốn thẻ thống kê, dự án và hoạt động gần đây từ API.
 - `src/features/projects/components/ProjectCards.tsx`: thẻ dự án với trạng thái, tiến độ, ngày cập nhật và số thành viên.
+- `src/features/projects/`: danh sách, tạo/sửa dự án, thùng rác và trang chi tiết.
+- `src/features/projects/media/`: xem trước nguồn, upload chia phần, ghi âm và bắt đầu xử lý tệp đã chọn.
+- `src/features/projects/jobs/`: tiến độ, thời gian, các giai đoạn, hủy/thử lại, lịch sử và kết quả riêng của từng tác vụ.
+- `src/features/projects/exports/`: xuất tệp và phụ đề video.
+- `src/features/library/`, `src/features/files/`: thư viện kết quả, kho tệp và xem nhanh.
 - `src/shared/hooks/useResource.ts`: tải dữ liệu có hủy yêu cầu khi rời trang, báo lỗi và thử lại.
 - `src/shared/`: API client, kiểu dữ liệu, hook tác vụ, thông báo và CSS dùng chung từ dự án gốc.
 - `src/app/layouts/WorkspaceLayout.tsx`: sidebar, header, footer, menu di động và chặn truy cập khi chưa đăng nhập.
@@ -37,9 +43,13 @@ Mã giao diện được trích từ dự án cục bộ. CSS, component và ki�
 
 Sau đăng nhập, Dashboard gọi `GET /api/dashboard` và hiển thị tổng dự án, số dự án hoàn thành, đang xử lý, thời lượng và dung lượng đã lưu. Trang có trạng thái tải, lỗi và nút thử lại; chỉ hiển thị số liệu do API trả về. Danh sách dự án gần đây hiển thị thẻ dự án và hướng dẫn theo vai trò khi chưa có dữ liệu. Hoạt động gần đây hiển thị tối đa bảy bản ghi theo thứ tự API trả về, tên người thực hiện (hoặc Hệ thống), hành động và ngày; có thông báo khi danh sách rỗng. Khung hiển thị tên và email tài khoản.
 
-Các mục dự án, thư viện, kho tệp, từ điển, thanh toán, hồ sơ, thông báo và cài đặt đã có đường dẫn, nhưng hiện chỉ hiển thị thông báo màn hình sẽ được bổ sung. Ô tìm kiếm trên header chuyển tới `/search?q=...`; chưa tải kết quả tìm kiếm. Chưa kèm tác vụ xử lý hay nghiệp vụ của các mục này; chúng chưa gọi API riêng.
+Các mục từ điển, tìm kiếm, thanh toán, hồ sơ, thông báo và cài đặt chưa được đưa vào bản này. Ô tìm kiếm trên header chuyển tới `/search?q=...`; chưa tải kết quả tìm kiếm.
 
-Thẻ dự án dẫn tới `/projects/:projectId`; đường dẫn này hiện hiển thị thông báo của mục Dự án trong khung ứng dụng. Trang danh sách và chi tiết dự án sẽ được bổ sung riêng, chưa chỉnh sửa hoặc tạo dự án ở phiên bản này.
+Thẻ dự án dẫn tới `/projects/:projectId`. Chọn tệp nguồn để xem trước và bắt đầu xử lý; giao diện kiểm tra quyền sửa, khả năng máy chủ và tác vụ đang chạy trước khi cho gửi yêu cầu. Trạng thái tác vụ cập nhật mỗi 2 giây, đồng hồ xử lý cập nhật mỗi giây và dừng khi tác vụ kết thúc. API vẫn phải kiểm tra quyền và ngăn tác vụ trùng trên máy chủ.
+
+Tab **Lịch sử xử lý** giữ bộ lọc tên tệp/mã tác vụ, trạng thái và trang trong URL. Tác vụ thành công có nút **Xem kết quả tác vụ**; bản ghi, OCR, biên bản và tệp tải xuống lấy từ lần xử lý đó, không thay bằng nguồn đang được chọn. Đây là màn hình đọc kết quả; các trình biên tập transcript, OCR và biên bản chưa nằm trong bản này.
+
+Xử lý dùng `GET /api/system/capabilities`, `GET/POST /api/projects/{id}/jobs`, `GET /api/jobs/{id}`, `POST /api/jobs/{id}/cancel`, `POST /api/jobs/{id}/retry` và `GET /api/jobs/{id}/results`. Khi máy chủ yêu cầu thanh toán, giao diện hiển thị lỗi API; màn hình thanh toán được đưa lên riêng ở mục 17.
 
 Nếu mở đường dẫn được bảo vệ khi chưa đăng nhập, ứng dụng chuyển tới `/login` và trở lại đúng đường dẫn, tham số và phần neo sau khi xác thực. Liên kết quản trị chỉ hiện theo vai trò; đường dẫn quản trị không phù hợp hiển thị từ chối truy cập. Đây là kiểm soát giao diện; API vẫn phải kiểm tra quyền ở máy chủ.
 

@@ -11,8 +11,8 @@ import "./jobs.css";
 export function JobCard({ job, canEdit, onComplete, onChange, onResults }: {
   job: Job;
   canEdit: boolean;
-  onComplete?: () => void;
-  onChange?: () => void;
+  onComplete?: (job: Job) => void;
+  onChange?: (job: Job) => void;
   onResults?: () => void;
 }) {
   const [value, setValue] = useState(job),
@@ -30,7 +30,7 @@ export function JobCard({ job, canEdit, onComplete, onChange, onResults }: {
     const attempt = value.job_id + ":" + (value.finished_at ?? "");
     if (!onComplete || completedAttempt.current === attempt) return;
     completedAttempt.current = attempt;
-    onComplete();
+    onComplete(value);
   }, [value.job_id, value.job_status_code, value.finished_at, onComplete]);
   useEffect(() => {
     setNow(Date.now());
@@ -139,7 +139,7 @@ export function JobCard({ job, canEdit, onComplete, onChange, onResults }: {
                   });
                   mutationVersion.current++;
                   setValue(updated);
-                  onChange?.();
+                  onChange?.(updated);
                 })
               }
             >
@@ -152,12 +152,10 @@ export function JobCard({ job, canEdit, onComplete, onChange, onResults }: {
               disabled={action.busy}
               onClick={() =>
                 action.run(async () => {
-                  setValue(
-                    await api.request<Job>(`/jobs/${value.job_id}/retry`, {
-                      method: "POST",
-                    }),
-                  );
-                  onChange?.();
+                  const updated = await api.request<Job>(`/jobs/${value.job_id}/retry`, { method: "POST" });
+                  mutationVersion.current++;
+                  setValue(updated);
+                  onChange?.(updated);
                 })
               }
             >

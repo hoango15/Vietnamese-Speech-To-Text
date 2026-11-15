@@ -56,6 +56,31 @@ it("opens processing history without discarding the selected media or filters", 
   expect(requests).toContain("/api/projects/p1/jobs?q=hop.wav&page=1&page_size=20");
 });
 
+it("starts processing the selected preview source and keeps it when opening history", async () => {
+  const posts: unknown[] = [];
+  await mount((url, options) => {
+    if (url === "/api/system/capabilities") return Response.json({ asr: true, ocr: true, diarization: true, llm: false, asr_model: "base", max_upload_bytes: 100000 });
+    if (url === "/api/projects/p1/media") return Response.json({ items: [media, { ...media, media_file_id: "m2", file_name: "other.wav", is_current: false }], total: 2 });
+    if (url === "/api/projects/p1/jobs" && options.method === "POST") {
+      posts.push(JSON.parse(String(options.body)));
+      return Response.json({ job_id: "j2", project_id: "p1", media_file_id: "m2", job_status_code: "QUEUED", progress_percent: 0, error_message: null, created_at: project.created_at });
+    }
+    return Response.json({ items: [], total: 0 });
+  });
+  const select = host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')!;
+  await act(() => { select.value = "m2"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  const speakers = host.querySelector<HTMLInputElement>('[aria-label="Tự phân biệt người nói"]');
+  expect(speakers).not.toBeNull();
+  await act(() => speakers!.click());
+  await act(() => [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Bắt đầu xử lý"))!.click());
+  expect(posts).toEqual([{ media_file_id: "m2", is_minutes_requested: false, is_diarization_requested: true }]);
+  const history = host.querySelector<HTMLAnchorElement>('a[href*="tab=jobs"]')!;
+  await act(() => history.click());
+  expect(window.location.search).toContain("media=m2");
+  await act(() => [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Tệp nguồn")!.click());
+  expect(host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')?.value).toBe("m2");
+});
+
 it("switches original files and displays the selected file's duration", async () => {
   await mount(() => Response.json({ items: [media, { ...media, media_file_id: "m2", file_name: "bai-giang.wav", duration_ms: 3600000, is_current: false }, { ...media, media_file_id: "generated", media_kind_code: "AUDIO_WAV", file_name: "derived.wav" }], total: 3 }));
   const select = host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]');
@@ -94,6 +119,7 @@ it("uploads a selected source, shows completion and reloads the server-provided 
   await mount((url, options) => {
     requests.push({ url, method: options.method ?? "GET", body: options.body });
     if (url === "/api/system/capabilities") return Response.json({ asr: false, ocr: false, diarization: false, llm: false, asr_model: "", max_upload_bytes: 1024 });
+    if (url === "/api/projects/p1/jobs" || url.startsWith("/api/glossaries")) return Response.json({ items: [], total: 0 });
     if (url === "/api/projects/p1/media") return Response.json({ items: completed ? [media] : [], total: completed ? 1 : 0 });
     if (url === "/api/uploads/u1/complete") { completed = true; return Response.json(media); }
     if (options.method === "PATCH") offset += (options.body as Blob).size;
@@ -110,7 +136,7 @@ it("uploads a selected source, shows completion and reloads the server-provided 
   expect(await (requests.find(item => item.method === "PATCH")!.body as Blob).text()).toBe("wave");
   expect(host.querySelector(".upload-card")?.textContent).toContain("Đã tải lên");
   expect(host.querySelector(".media-info")?.textContent).toContain("00:01:05");
-  expect(requests.some(item => item.url.includes("/jobs"))).toBe(false);
+  expect(requests.some(item => item.url.includes("/jobs") && item.method === "POST")).toBe(false);
 });
 
 it("hides upload controls for read-only projects", async () => {
