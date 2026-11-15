@@ -6,6 +6,7 @@ import { date, time } from "../../../shared/lib/format";
 import { ErrorBox, Status } from "../../../shared/ui/components";
 import { message } from "../../../shared/lib/errors";
 import { useAction } from "../../../shared/hooks/useAction";
+import "./jobs.css";
 
 export function JobCard({ job, canEdit, onComplete, onChange, onResults }: {
   job: Job;
@@ -19,10 +20,18 @@ export function JobCard({ job, canEdit, onComplete, onChange, onResults }: {
     [now, setNow] = useState(Date.now),
     action = useAction();
   const mutationVersion = useRef(0);
+  const completedAttempt = useRef<string | null>(null);
   useEffect(() => setValue(job), [job]);
   useEffect(() => {
-    if (value.job_status_code === "SUCCEEDED") onComplete?.();
-  }, [value.job_id, value.job_status_code, onComplete]);
+    if (value.job_status_code !== "SUCCEEDED") {
+      completedAttempt.current = null;
+      return;
+    }
+    const attempt = value.job_id + ":" + (value.finished_at ?? "");
+    if (!onComplete || completedAttempt.current === attempt) return;
+    completedAttempt.current = attempt;
+    onComplete();
+  }, [value.job_id, value.job_status_code, value.finished_at, onComplete]);
   useEffect(() => {
     setNow(Date.now());
     if (value.job_status_code !== "RUNNING") return;

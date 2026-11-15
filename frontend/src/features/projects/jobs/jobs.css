@@ -1,0 +1,8 @@
+.job-card { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.job-card p { margin: 0; overflow-wrap: anywhere; }
+.job-top, .job-progress-label, .job-timing, .job-stages > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.job-card .progress { height: 8px; overflow: hidden; border-radius: 8px; background: #e8edf2; }
+.job-card .progress > span { display: block; height: 100%; background: var(--teal); transition: width .2s ease; }
+.job-timing, .job-progress-hint { color: var(--muted); font-size: 12px; }
+.job-stages { display: grid; gap: 8px; }
+.job-stages .danger { flex-basis: 100%; }
