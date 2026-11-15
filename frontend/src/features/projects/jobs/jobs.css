@@ -11,3 +11,4 @@
 .jobs-panel .toolbar input { flex: 1; min-width: 160px; }
 .project-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
 .project-tabs [aria-pressed="true"] { color: var(--teal); border-color: var(--teal); }
+.job-results .preview-text { white-space: pre-wrap; overflow-wrap: anywhere; }

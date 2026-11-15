@@ -1,12 +1,16 @@
 import { RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Job, List, Project } from "../../../shared/types";
 import { Empty, ErrorBox, Loading, Pagination, statusNames } from "../../../shared/ui/components";
 import { useResource } from "../../../shared/hooks/useResource";
 import { JobCard } from "./JobCard";
+import { JobResults } from "./JobResults";
 
 export function JobsPanel({ project }: { project: Project }) {
   const [params, setParams] = useSearchParams();
+  const [selected, setSelected] = useState<Job | null>(null);
+  useEffect(() => setSelected(null), [project.project_id]);
   const q = params.get("jobs_q") ?? "";
   const status = params.get("jobs_status") ?? "";
   const pageValue = Number(params.get("jobs_page") ?? 1);
@@ -56,7 +60,7 @@ export function JobsPanel({ project }: { project: Project }) {
         <Loading />
       ) : data?.items.length ? (
         data.items.map((job) => (
-          <JobCard job={job} canEdit={project.can_edit} key={job.job_id} onChange={reload} />
+          <JobCard job={job} canEdit={project.can_edit} key={job.job_id} onChange={reload} onResults={() => setSelected(job)} />
         ))
       ) : (
         <Empty
@@ -65,6 +69,7 @@ export function JobsPanel({ project }: { project: Project }) {
         />
       )}
       {data && !error && <Pagination page={page} total={data.total} onChange={value => filter({ jobs_page: String(value) })} />}
+      {selected?.project_id === project.project_id && <JobResults key={selected.job_id} job={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

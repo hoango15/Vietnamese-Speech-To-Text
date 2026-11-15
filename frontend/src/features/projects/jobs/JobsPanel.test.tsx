@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { JobsPanel } from "./JobsPanel";
-import type { Project } from "../../../shared/types";
+import type { Job, Project } from "../../../shared/types";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
@@ -53,4 +53,21 @@ it("retries a failed history request and renders the empty result", async () => 
   await act(() => [...host.querySelectorAll("button")].find(button => button.textContent === "Thử lại")!.click());
   expect(host.textContent).toContain("Chưa có lần xử lý nào");
   expect(requests).toEqual(["/api/projects/p1/jobs?q=&page=1&page_size=20", "/api/projects/p1/jobs?q=&page=1&page_size=20"]);
+});
+
+it("opens results for the successful history entry", async () => {
+  const job: Job = { job_id: "job-old", project_id: "p1", media_file_id: "source-old", file_name: "old.png",
+    job_status_code: "SUCCEEDED", progress_percent: 100, error_message: null, created_at: "2026-11-12T00:00:00Z", stages: [] };
+  vi.stubGlobal("fetch", async (url: string) => Response.json(url.endsWith("/results")
+    ? { media: { media_file_id: "source-old", file_name: "old.png" }, transcript: null, minutes: null, exports: [], ocr: { document_text: "Kết quả ảnh cũ" } }
+    : { items: [job], total: 1 }));
+  const router = createMemoryRouter([{ path: "/projects/:id", element: <JobsPanel project={project} /> }], { initialEntries: ["/projects/p1?tab=jobs"] });
+  const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
+  await act(async () => root.render(<RouterProvider router={router} />));
+  const results = [...host.querySelectorAll("button")].find(button => button.textContent === "Xem kết quả tác vụ");
+  expect(results).toBeDefined();
+  await act(() => results!.click());
+  expect(document.body.querySelector("dialog")?.textContent).toContain("Kết quả ảnh cũ");
+  await act(() => document.body.querySelector<HTMLButtonElement>('[aria-label="Đóng hộp thoại"]')!.click());
+  expect(document.body.querySelector("dialog")).toBeNull();
 });
