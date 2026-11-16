@@ -171,6 +171,13 @@
   gap: 8px;
   min-height: 133px;
 }
+.dashboard-stats .stat-card > div:first-child {
+  min-width: 0;
+}
+.dashboard-stats .stat-value {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
 .stat-card > div > span {
   color: var(--muted);
   font-size: 10px;

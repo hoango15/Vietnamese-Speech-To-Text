@@ -66,7 +66,7 @@ export function DashboardPage() {
           <AudioLines className="art-audio" size={29} />
         </div>
       </section>
-      <div className="stats-grid">
+      <div className="stats-grid dashboard-stats">
         {[
           {
             label: "Tổng dự án",
