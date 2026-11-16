@@ -103,3 +103,160 @@ def start(project_id:UUID,body:JobBody,user=Depends(current_user)):
     with connection() as conn:row=create_job(conn,user,project_id,body)
     enqueue(row['job_id'])
     with connection() as conn:return job_data(conn,one(conn,'SELECT * FROM processing_job WHERE job_id=%s',(row['job_id'],)))
+    
+    
+@router.get('/projects/{project_id}/jobs')
+def list_jobs(project_id:UUID,q:str='',status:Literal['QUEUED','RUNNING','SUCCEEDED','FAILED','CANCELED']|None=None,
+              page:int=1,page_size:int=20,user=Depends(current_user)):
+    with connection() as conn:
+        project(conn,user,project_id)
+        limit,offset=pagination(page,page_size)
+        where='j.project_id=%s AND (m.file_name ILIKE %s OR j.job_id::text ILIKE %s)'
+        params=[project_id,'%'+q[:200]+'%','%'+q[:200]+'%']
+        if status:where+=' AND j.job_status_code=%s';params.append(status)
+        source=' FROM processing_job j JOIN media_file m USING(media_file_id) WHERE '+where
+        rows=all_rows(conn,'SELECT j.*,m.file_name'+source+' ORDER BY j.created_at DESC,j.job_id LIMIT %s OFFSET %s',(*params,limit,offset))
+        total=one(conn,'SELECT count(*) AS n'+source,params)['n']
+        return {'items':[job_data(conn,r) for r in rows],'total':total}
+
+
+@router.get('/jobs/{job_id}')
+def detail(job_id:UUID,user=Depends(current_user)):
+    with connection() as conn:return job_data(conn,resource(conn,user,'processing_job','job_id',job_id))
+
+
+@router.get('/jobs/{job_id}/progress')
+def progress(job_id:UUID,user=Depends(current_user)):return detail(job_id,user)
+
+
+@router.get('/jobs/{job_id}/results')
+def results(job_id:UUID,user=Depends(current_user)):
+    from .transcripts import transcript_data
+    from .documents import minutes_data
+    with connection() as conn:
+        job=resource(conn,user,'processing_job','job_id',job_id)
+        media=one(conn,'SELECT media_file_id,file_name FROM media_file WHERE media_file_id=%s',(job['media_file_id'],))
+        transcript=one(conn,'SELECT * FROM transcript WHERE job_id=%s ORDER BY version_no DESC LIMIT 1',(job_id,))
+        minutes=one(conn,'''SELECT m.* FROM minutes m JOIN transcript t USING(transcript_id)
+            WHERE t.job_id=%s ORDER BY m.version_no DESC LIMIT 1''',(job_id,))
+        files=all_rows(conn,'''SELECT e.export_file_id,e.file_name,e.export_kind_code,e.source,e.transcript_id
+            FROM export_file e JOIN transcript t USING(transcript_id) WHERE t.job_id=%s
+            AND e.export_kind_code<>'BURNED_VIDEO'
+            ORDER BY e.created_at DESC,e.export_file_id''',(job_id,))
+        saved=one(conn,"SELECT event_payload FROM job_event WHERE job_id=%s AND event_type='RESULT' ORDER BY job_event_id DESC LIMIT 1",(job_id,))
+        saved=saved['event_payload'] if saved else {}
+        ocr=None
+        if job['job_kind']=='BURN_IN':
+            if not saved:
+                options=one(conn,"SELECT event_payload FROM job_event WHERE job_id=%s AND event_type='OPTIONS' ORDER BY job_event_id DESC LIMIT 1",(job_id,))
+                saved=options['event_payload'] if options else {}
+            transcript=one(conn,'SELECT * FROM transcript WHERE transcript_id=%s AND project_id=%s',(saved.get('transcript_id'),job['project_id']))
+            files=all_rows(conn,'''SELECT export_file_id,file_name,export_kind_code,source,transcript_id FROM export_file
+                WHERE project_id=%s AND (export_file_id=%s OR storage_key LIKE %s)''',
+                (job['project_id'],saved.get('export_file_id'),f'exports/{job_id}-%'))
+        elif job['job_kind']=='OCR':
+            ocr=one(conn,'SELECT ocr_document_id,document_text FROM ocr_document WHERE ocr_document_id=%s AND project_id=%s',
+                    (saved.get('ocr_document_id'),job['project_id']))
+            files=all_rows(conn,'''SELECT e.export_file_id,e.file_name,e.export_kind_code,e.source,e.transcript_id
+                FROM export_file e WHERE e.project_id=%s AND EXISTS(SELECT 1 FROM job_event v
+                WHERE v.job_id=%s AND v.event_type='EXPORT' AND v.event_payload->>'export_file_id'=e.export_file_id::text)
+                ORDER BY e.created_at DESC,e.export_file_id''',(job['project_id'],job_id))
+        if minutes:
+            minutes={**minutes,'transcript_version_no':one(conn,'SELECT version_no FROM transcript WHERE transcript_id=%s',(minutes['transcript_id'],))['version_no']}
+        return {'media':media,'transcript':transcript_data(conn,transcript) if transcript else None,
+                'minutes':minutes_data(conn,minutes) if minutes else None,'exports':files,'ocr':ocr}
+
+
+@router.get('/jobs/{job_id}/stages')
+def stages(job_id:UUID,user=Depends(current_user)):
+    rows=detail(job_id,user)['stages'];return {'items':rows,'total':len(rows)}
+
+
+@router.get('/jobs/{job_id}/logs')
+def logs(job_id:UUID,user=Depends(current_user)):
+    with connection() as conn:
+        resource(conn,user,'processing_job','job_id',job_id)
+        rows=all_rows(conn,'SELECT * FROM job_event WHERE job_id=%s ORDER BY job_event_id DESC LIMIT 100',(job_id,))
+        return {'items':rows,'total':len(rows)}
+
+
+@router.post('/jobs/{job_id}/cancel')
+def cancel(job_id:UUID,user=Depends(current_user)):
+    with connection() as conn:
+        row=resource(conn,user,'processing_job','job_id',job_id,write=True)
+        conn.execute('SELECT job_id FROM processing_job WHERE job_id=%s FOR UPDATE',(job_id,))
+        current=one(conn,'SELECT * FROM processing_job WHERE job_id=%s',(job_id,))
+        if current['job_status_code'] not in ('QUEUED','RUNNING'):raise HTTPException(409,'Chỉ hủy được tác vụ đang chờ hoặc đang chạy')
+        row=one(conn,"UPDATE processing_job SET job_status_code='CANCELED',finished_at=GREATEST(now(),started_at) WHERE job_id=%s RETURNING *",(job_id,))
+        project_status(conn,row['project_id'],'DRAFT')
+        event(conn,job_id,'CANCELED',{})
+        return job_data(conn,row)
+
+
+@router.post('/jobs/{job_id}/retry')
+def retry(job_id:UUID,user=Depends(current_user)):
+    with connection() as conn:
+        row=resource(conn,user,'processing_job','job_id',job_id,write=True)
+        conn.execute('SELECT project_id FROM project WHERE project_id=%s FOR UPDATE',(row['project_id'],))
+        project(conn,user,row['project_id'],write=True)
+        row=one(conn,'SELECT * FROM processing_job WHERE job_id=%s FOR UPDATE',(job_id,))
+        if row['job_status_code']!='FAILED':raise HTTPException(409,'Chỉ chạy lại được tác vụ thất bại')
+        if row['job_kind']=='TRANSCRIBE' and not (row['is_minutes_requested'] or row['is_diarization_requested']):
+            raise HTTPException(422,'Chọn phân biệt người nói hoặc tạo biên bản và tạo tác vụ mới cho tệp này.')
+        if one(conn,"SELECT 1 FROM processing_job WHERE media_file_id=%s AND job_status_code IN ('QUEUED','RUNNING')",(row['media_file_id'],)):
+            raise HTTPException(409,'Dự án đang có tác vụ khác')
+        conn.execute("UPDATE processing_job SET job_status_code='QUEUED',progress_percent=0,started_at=NULL,finished_at=NULL WHERE job_id=%s",(job_id,))
+        conn.execute("UPDATE project SET project_status_code='PROCESSING' WHERE project_id=%s",(row['project_id'],))
+        event(conn,job_id,'RETRY',{})
+    enqueue(job_id)
+    return detail(job_id,user)
+
+
+@router.get('/jobs/{job_id}/events')
+def events(job_id:UUID,authorization:str=Header(),user=Depends(current_user)):
+    detail(job_id,user)
+    def stream():
+        cursor=0
+        while True:
+            try:
+                fresh=current_user(authorization)
+                with connection() as conn:
+                    job=resource(conn,fresh,'processing_job','job_id',job_id)
+                    rows=all_rows(conn,'SELECT * FROM job_event WHERE job_id=%s AND job_event_id>%s ORDER BY job_event_id',(job_id,cursor))
+                for row in rows:
+                    cursor=row['job_event_id']
+                    yield f'id: {cursor}\nevent: progress\ndata: {json.dumps(row,default=str,ensure_ascii=False)}\n\n'
+                if job['job_status_code'] in ('SUCCEEDED','FAILED','CANCELED'):break
+                yield ': heartbeat\n\n';time.sleep(2)
+            except HTTPException:
+                yield 'event: closed\ndata: {"detail":"Quyền truy cập hoặc phiên đã hết hạn"}\n\n';break
+    return StreamingResponse(stream(),media_type='text/event-stream',headers={'X-Accel-Buffering':'no'})
+
+
+class BurnBody(StrictBody):
+    max_chars_per_line:int=Field(default=42,ge=10,le=120)
+    includes_speaker_label:bool=False
+    transcript_id:UUID|None=None
+    media_file_id:UUID|None=None
+
+
+@router.post('/projects/{project_id}/subtitles/burn-in',status_code=201)
+def burn(project_id:UUID,body:BurnBody,user=Depends(current_user)):
+    with connection() as conn:
+        project(conn,user,project_id,write=True)
+        conn.execute('SELECT project_id FROM project WHERE project_id=%s FOR UPDATE',(project_id,))
+        mid=source_id(conn,project_id,body.media_file_id)
+        source=one(conn,"SELECT * FROM media_file WHERE media_file_id=%s AND media_kind_code='ORIGINAL_VIDEO'",(mid,))
+        if not source:raise HTTPException(409,'Cần video nguồn để gắn phụ đề')
+        transcript=one(conn,'SELECT transcript_id FROM transcript WHERE project_id=%s AND media_file_id IS NOT DISTINCT FROM %s AND is_current',(project_id,mid))
+        if not transcript:raise HTTPException(409,'Cần transcript trước khi gắn phụ đề')
+        if (body.media_file_id and body.media_file_id!=source['media_file_id']) or (body.transcript_id and body.transcript_id!=transcript['transcript_id']):
+            raise HTTPException(409,'Video hoặc bản ghi đã thay đổi. Hãy tải lại trước khi tạo Vietsub.')
+        row=create_job(conn,user,project_id,JobBody(media_file_id=source['media_file_id'],is_minutes_requested=False),'BURN_IN')
+        options={**body.model_dump(mode='json'),'transcript_id':str(transcript['transcript_id'])}
+        if body.includes_speaker_label:
+            labels=all_rows(conn,'''SELECT ts.segment_id,COALESCE(NULLIF(s.display_name,''),s.speaker_label) AS label
+                FROM transcript_segment ts LEFT JOIN speaker s USING(speaker_id) WHERE ts.transcript_id=%s''',(transcript['transcript_id'],))
+            options['segment_speaker_labels']={str(item['segment_id']):item['label'] for item in labels if item['label']}
+        event(conn,row['job_id'],'OPTIONS',options)
+    enqueue(row['job_id']);return detail(row['job_id'],user)
