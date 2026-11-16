@@ -472,9 +472,17 @@
 @media (max-width: 1000px) {
   .dashboard-columns { grid-template-columns: 1fr; }
   .dashboard-columns .project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-columns .activity-card { margin-top: 5px; }
+  .dashboard-columns .activity-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .dashboard-columns .activity-item:not(:last-child):before { display: none; }
+}
+@media (max-width: 760px) {
+  .dashboard-columns .activity-list { gap: 15px; }
 }
 @media (max-width: 480px) {
   .dashboard-columns .project-grid { grid-template-columns: 1fr; }
   .dashboard-columns .section-heading h2 { font-size: 14px; }
   .dashboard-columns .text-link { font-size: 10px; }
+  .dashboard-columns .activity-list { grid-template-columns: 1fr; gap: 0; }
+  .dashboard-columns .activity-item:not(:last-child):before { display: block; }
 }
