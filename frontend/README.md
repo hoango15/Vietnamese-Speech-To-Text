@@ -41,7 +41,9 @@ npm run build
 
 Mã giao diện được trích từ dự án cục bộ. CSS, component và kiểu dữ liệu gồm xác thực, khung ứng dụng và các phần Dashboard đã hoàn thành, giữ responsive và hỗ trợ giảm chuyển động.
 
-Sau đăng nhập, Dashboard gọi `GET /api/dashboard` và hiển thị tổng dự án, số dự án hoàn thành, đang xử lý, thời lượng và dung lượng đã lưu. Trang có trạng thái tải, lỗi và nút thử lại; chỉ hiển thị số liệu do API trả về. Danh sách dự án gần đây hiển thị thẻ dự án và hướng dẫn theo vai trò khi chưa có dữ liệu. Hoạt động gần đây hiển thị tối đa bảy bản ghi theo thứ tự API trả về, tên người thực hiện (hoặc Hệ thống), hành động và ngày; có thông báo khi danh sách rỗng. Khung hiển thị tên và email tài khoản.
+Sau đăng nhập, Dashboard gọi `GET /api/dashboard` và hiển thị tổng dự án, số dự án hoàn thành, đang xử lý, thời lượng và dung lượng đã lưu. Trang có trạng thái tải, lỗi và nút thử lại; chỉ hiển thị số liệu do API trả về. Danh sách dự án gần đây hiển thị thẻ dự án và hướng dẫn theo vai trò khi chưa có dữ liệu. Hoạt động gần đây tải riêng từ `GET /api/audit-logs?page=N&page_size=7`, hiển thị bảy bản ghi mỗi trang, tên người thực hiện (hoặc Hệ thống), hành động và ngày. Lỗi tải hoạt động có nút thử lại và không làm mất thống kê. Khung hiển thị tên và email tài khoản.
+
+Dashboard có xóa từng nhật ký và **Xóa tất cả** nhật ký được phép xóa trên mọi trang. Cả hai thao tác đều yêu cầu xác nhận, không thể hoàn tác qua giao diện. Nút xóa từng dòng chỉ xuất hiện khi API trả `can_delete`; xóa tất cả bị khóa khi không có quyền, đang tải/xóa hoặc tải lỗi. Xóa thành công sẽ tải lại trang hiện tại và lùi về trang còn dữ liệu nếu trang cuối đã hết. Hủy xác nhận hoặc yêu cầu lỗi không tự xóa bản ghi trên giao diện.
 
 Các mục từ điển, tìm kiếm, thanh toán, hồ sơ, thông báo và cài đặt chưa được đưa vào bản này. Ô tìm kiếm trên header chuyển tới `/search?q=...`; chưa tải kết quả tìm kiếm.
 
@@ -74,6 +76,18 @@ GitHub Actions chạy `npm ci`, `npm test` và `npm run build` khi mã frontend 
 Đăng nhập và refresh trả `{ access_token, user }`, theo kiểu `Session` trong `src/shared/types.ts`. Access token giữ trong bộ nhớ; API client gửi cookie với `credentials: "include"`. API chịu trách nhiệm kiểm tra dữ liệu, quản lý tài khoản và cấp cookie phiên.
 
 Dashboard dùng phản hồi `{ stats: { projects, ready, processing, duration_ms, storage_bytes }, projects: Project[], activities: Audit[] }`. Kiểu `Project` và `Audit` nằm trong `src/shared/types.ts`. Thời lượng là mili giây, dung lượng là byte; giao diện định dạng thành `HH:MM:SS` và đơn vị B/KB/MB/GB. Backend cần trả thống kê, dự án và hoạt động theo quyền truy cập của tài khoản, sắp xếp dự án và hoạt động mới nhất trước; frontend không tự suy diễn số liệu khi yêu cầu lỗi.
+
+Phân trang và xóa hoạt động cần backend có API tương thích và migration `012_activity_logs.sql`:
+
+| Yêu cầu | Phản hồi |
+| --- | --- |
+| `GET /api/audit-logs?page=N&page_size=7` | `{ items: Audit[], total, deletable_total }`; mỗi dòng có `can_delete` |
+| `DELETE /api/audit-logs/{audit_log_id}` | `{ ok: true }` |
+| `DELETE /api/audit-logs` | `{ ok: true, deleted }`; áp dụng trên mọi trang trong phạm vi được phép |
+
+Backend phải giới hạn dữ liệu theo tổ chức và kiểm tra lại quyền xóa hiện tại: log của bản thân, công ty thực sự đang sở hữu hoặc tổ chức do admin quản lý. Quyền xem dự án được chia sẻ không cho phép xóa log của cộng tác viên. Các cờ giao diện không thay thế kiểm tra quyền ở máy chủ. Đợt này chỉ công bố giao diện Dashboard; không kèm backend/migration hoặc thay đổi màn hình quản trị.
+
+Lưu ý kiểm tra nhánh: commit nền `844b58d` đã có `src/features/admin/AdminGuard.tsx` nhập hai module chưa công bố là `AdminConsole` và `CompaniesPage`. Do đó `npm run typecheck`, `npm run build` và CI chuẩn vẫn lỗi hai import này cho tới khi module quản trị được hoàn thiện. Đợt Dashboard giữ nguyên các tệp đó; toàn bộ kiểm thử frontend, kiểm tra kiểu phần source còn lại và Vite production bundle đã được xác minh riêng. Không thêm ngoại lệ vào cấu hình TypeScript hoặc CI của dự án.
 
 Sau đăng ký thành công, giao diện chuyển về đăng nhập. Mật khẩu đăng ký dài 10–128 ký tự, có ít nhất một chữ A–Z và một chữ số. Khi triển khai bản build, cấu hình máy chủ phục vụ `index.html` cho các đường dẫn giao diện và chuyển tiếp `/api` tới máy chủ xác thực.
 

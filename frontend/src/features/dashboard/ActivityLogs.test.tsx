@@ -122,3 +122,50 @@ it("sends only one delete request for repeated clicks and refreshes the current 
   expect(host.querySelectorAll(".activity-item")).toHaveLength(2);
   expect(host.textContent).toContain("9 kết quả · Trang 2/2");
 });
+
+it("hides row deletion and disables clear-all for records without permission", async () => {
+  records = [entry(1, false)];
+  const host = await mount();
+  expect(host.querySelector('[aria-label="Xóa nhật ký 1"]')).toBeNull();
+  expect(button("Xóa tất cả").disabled).toBe(true);
+});
+
+it("clears deletable dashboard records across pages and keeps collaborators' records", async () => {
+  records = [...Array.from({ length: 8 }, (_, index) => entry(index + 1)), entry(9, false)];
+  const host = await mount();
+  await act(async () => button("Xóa tất cả").click());
+  expect(requests).toContainEqual({ path: "/api/audit-logs", method: "DELETE" });
+  expect(host.querySelectorAll(".activity-item")).toHaveLength(1);
+  expect(host.textContent).toContain("1 kết quả · Trang 1/1");
+});
+
+it("keeps all entries when bulk deletion is canceled or fails", async () => {
+  records = [entry(1)];
+  const host = await mount();
+  vi.mocked(window.confirm).mockReturnValue(false);
+  await act(async () => button("Xóa tất cả").click());
+  expect(requests.some(item => item.method === "DELETE")).toBe(false);
+  vi.mocked(window.confirm).mockReturnValue(true);
+  failDelete = true;
+  await act(async () => button("Xóa tất cả").click());
+  expect(host.querySelectorAll(".activity-item")).toHaveLength(1);
+  expect(host.textContent).toContain("Không xóa được nhật ký");
+});
+
+it("disables bulk deletion while refresh is pending or failed and recovers on retry", async () => {
+  records = [entry(1)];
+  const host = await mount();
+  expect(button("Xóa tất cả").disabled).toBe(false);
+  let finish!: () => void;
+  waitForDelete = new Promise<void>(resolve => { finish = resolve; });
+  await act(() => button("Xóa tất cả").click());
+  expect(button("Xóa tất cả").disabled).toBe(true);
+  failAudit = true;
+  await act(async () => finish());
+  expect(host.textContent).toContain("Activity unavailable");
+  expect(button("Xóa tất cả").disabled).toBe(true);
+  failAudit = false;
+  await act(async () => button("Thử lại").click());
+  expect(host.querySelectorAll(".activity-item")).toHaveLength(0);
+  expect(button("Xóa tất cả").disabled).toBe(true);
+});

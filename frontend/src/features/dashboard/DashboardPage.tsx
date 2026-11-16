@@ -155,6 +155,10 @@ export function DashboardPage() {
             <h2>Hoạt động gần đây</h2>
             <Activity size={18} />
           </div>
+          <div className="activity-actions">
+            <button className="button secondary small" disabled={deletion.busy || activity.loading || Boolean(activity.error) || !activity.data?.deletable_total}
+              onClick={() => deletion.remove()}><Trash2 size={14} />Xóa tất cả</button>
+          </div>
           {activity.error ? <ErrorBox error={activity.error} retry={activity.reload} /> : activity.loading ? <Loading /> : activity.data?.items.length ? (
             <ol className="activity-list">
               {activity.data.items.map((entry) => (
