@@ -130,3 +130,78 @@ def words(transcript_id:UUID,user=Depends(current_user)):
         return {'items':rows,'total':len(rows)}
 
 
+@router.get('/projects/{project_id}/transcripts/search')
+def search(project_id:UUID,q:str='',media_file_id:UUID|None=None,user=Depends(current_user)):
+    with connection() as conn:
+        project(conn,user,project_id)
+        mid=source_id(conn,project_id,media_file_id)
+        rows=all_rows(conn,'''SELECT s.* FROM transcript_segment s JOIN transcript t ON t.transcript_id=s.transcript_id
+            WHERE t.project_id=%s AND t.media_file_id IS NOT DISTINCT FROM %s AND t.is_current AND s.segment_text ILIKE %s ORDER BY s.segment_no LIMIT 100''',(project_id,mid,'%'+q[:300]+'%'))
+        return {'items':rows,'total':len(rows)}
+
+
+class SpeakerBody(StrictBody):
+    display_name:str=Field(min_length=1,max_length=200)
+    color_hex:str=Field(default='#0d9488',pattern=r'^#[0-9a-fA-F]{6}$')
+
+
+@router.get('/projects/{project_id}/speakers')
+def speakers(project_id:UUID,media_file_id:UUID|None=None,user=Depends(current_user)):
+    with connection() as conn:
+        project(conn,user,project_id)
+        mid=source_id(conn,project_id,media_file_id)
+        rows=all_rows(conn,'''SELECT * FROM speaker WHERE project_id=%s AND
+            (media_file_id IS NOT DISTINCT FROM %s OR speaker_id IN (
+                SELECT s.speaker_id FROM transcript_segment s JOIN transcript t USING(transcript_id)
+                WHERE t.project_id=%s AND t.media_file_id IS NOT DISTINCT FROM %s))
+            ORDER BY speaker_label''',(project_id,mid,project_id,mid))
+        return {'items':rows,'total':len(rows)}
+
+
+@router.post('/projects/{project_id}/speakers',status_code=201)
+def add_speaker(project_id:UUID,body:SpeakerBody,media_file_id:UUID|None=None,user=Depends(current_user)):
+    with connection() as conn:
+        project(conn,user,project_id,write=True)
+        conn.execute('SELECT project_id FROM project WHERE project_id=%s FOR UPDATE',(project_id,))
+        mid=source_id(conn,project_id,media_file_id)
+        from uuid import uuid4
+        return one(conn,'''INSERT INTO speaker(project_id,media_file_id,speaker_label,display_name,color_hex) VALUES (%s,%s,%s,%s,%s) RETURNING *''',
+                   (project_id,mid,'SPEAKER_'+uuid4().hex[:12],body.display_name,body.color_hex))
+
+
+@router.get('/speakers/{speaker_id}')
+def get_speaker(speaker_id:UUID,user=Depends(current_user)):
+    with connection() as conn:return resource(conn,user,'speaker','speaker_id',speaker_id)
+
+
+@router.patch('/speakers/{speaker_id}')
+def edit_speaker(speaker_id:UUID,body:SpeakerBody,user=Depends(current_user)):
+    with connection() as conn:
+        row=resource(conn,user,'speaker','speaker_id',speaker_id,write=True)
+        conn.execute('SELECT project_id FROM project WHERE project_id=%s FOR UPDATE',(row['project_id'],))
+        return one(conn,'UPDATE speaker SET display_name=%s,color_hex=%s WHERE speaker_id=%s RETURNING *',(body.display_name,body.color_hex,speaker_id))
+
+
+@router.delete('/speakers/{speaker_id}')
+def delete_speaker(speaker_id:UUID,user=Depends(current_user)):
+    with connection() as conn:
+        row=resource(conn,user,'speaker','speaker_id',speaker_id,write=True)
+        conn.execute('SELECT project_id FROM project WHERE project_id=%s FOR UPDATE',(row['project_id'],))
+        conn.execute('DELETE FROM speaker WHERE speaker_id=%s',(speaker_id,))
+    return {'ok':True}
+
+
+class MergeSpeaker(StrictBody):target_speaker_id:UUID
+
+
+@router.post('/speakers/{speaker_id}/merge')
+def merge_speaker(speaker_id:UUID,body:MergeSpeaker,user=Depends(current_user)):
+    with connection() as conn:
+        source=resource(conn,user,'speaker','speaker_id',speaker_id,write=True)
+        target=resource(conn,user,'speaker','speaker_id',body.target_speaker_id,write=True)
+        if source['project_id']!=target['project_id'] or source['media_file_id']!=target['media_file_id'] or speaker_id==body.target_speaker_id:raise HTTPException(422,'Hai người nói phải khác nhau và thuộc cùng tệp')
+        conn.execute('SELECT project_id FROM project WHERE project_id=%s FOR UPDATE',(source['project_id'],))
+        conn.execute('UPDATE transcript_segment SET speaker_id=%s WHERE speaker_id=%s',(body.target_speaker_id,speaker_id))
+        conn.execute('UPDATE action_item SET assignee_speaker_id=%s WHERE assignee_speaker_id=%s',(body.target_speaker_id,speaker_id))
+        conn.execute('DELETE FROM speaker WHERE speaker_id=%s',(speaker_id,))
+        return target
