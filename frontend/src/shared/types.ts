@@ -44,7 +44,9 @@ export interface Audit {
   occurred_at: string;
   full_name?: string;
   change_detail?: unknown;
+  can_delete?: boolean;
 }
+export interface AuditList extends List<Audit> { deletable_total: number }
 
 export interface Company {
   company_id: string;

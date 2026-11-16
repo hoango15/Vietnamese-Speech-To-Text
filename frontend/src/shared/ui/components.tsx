@@ -160,15 +160,17 @@ export function Pagination({
   page,
   total,
   onChange,
+  pageSize = 20,
 }: {
   page: number;
   total: number;
   onChange: (page: number) => void;
+  pageSize?: number;
 }) {
   return (
     <div className="pagination">
       <span>
-        {total} kết quả · Trang {page}/{Math.max(1, Math.ceil(total / 20))}
+        {total} kết quả · Trang {page}/{Math.max(1, Math.ceil(total / pageSize))}
       </span>
       <div>
         <button
@@ -180,7 +182,7 @@ export function Pagination({
         </button>
         <button
           className="button small secondary"
-          disabled={page * 20 >= total}
+          disabled={page * pageSize >= total}
           onClick={() => onChange(page + 1)}
         >
           Sau
