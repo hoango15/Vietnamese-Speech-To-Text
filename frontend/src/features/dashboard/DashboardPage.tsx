@@ -1,11 +1,12 @@
-import type { Audit, Project } from "../../shared/types";
+import { useEffect, useState } from "react";
+import type { Audit, AuditList, Project } from "../../shared/types";
 import { ProjectCards } from "../projects/components/ProjectCards";
 import { Link } from "react-router-dom";
 import { Activity, ArrowRight, AudioLines, Check, CheckCircle2, Clock3, FolderClosed } from "lucide-react";
 import { canCreateProject } from "../projects/lib/permissions";
 import { useResource } from "../../shared/hooks/useResource";
 import { bytes, date, time } from "../../shared/lib/format";
-import { Empty, ErrorBox, Loading, PageTitle } from "../../shared/ui/components";
+import { Empty, ErrorBox, Loading, PageTitle, Pagination } from "../../shared/ui/components";
 import { useAuth } from "../auth/AuthProvider";
 import "./dashboard.css";
 
@@ -22,6 +23,13 @@ export function DashboardPage() {
         storage_bytes: number;
       };
     }>("/dashboard");
+  const [activityPage, setActivityPage] = useState(1);
+  const activity = useResource<AuditList>(`/audit-logs?page=${activityPage}&page_size=7`);
+  useEffect(() => {
+    if (activity.loading || activity.error || !activity.data) return;
+    const lastPage = Math.max(1, Math.ceil(activity.data.total / 7));
+    if (activityPage > lastPage) setActivityPage(lastPage);
+  }, [activity.loading, activity.error, activity.data, activityPage]);
   if (loading) return <Loading />;
   if (error) return <ErrorBox error={error} retry={reload} />;
   if (!data) return null;
@@ -145,9 +153,9 @@ export function DashboardPage() {
             <h2>Hoạt động gần đây</h2>
             <Activity size={18} />
           </div>
-          {data.activities.length ? (
+          {activity.error ? <ErrorBox error={activity.error} retry={activity.reload} /> : activity.loading ? <Loading /> : activity.data?.items.length ? (
             <ol className="activity-list">
-              {data.activities.slice(0, 7).map((entry) => (
+              {activity.data.items.map((entry) => (
                 <li className="activity-item" key={entry.audit_log_id}>
                   <span className="activity-dot" />
                   <div>
@@ -165,6 +173,7 @@ export function DashboardPage() {
               Chưa có hoạt động được ghi nhận.
             </p>
           )}
+          {activity.data && !activity.error && <Pagination page={activityPage} total={activity.data.total} pageSize={7} onChange={setActivityPage} />}
         </section>
       </div>
     </>
