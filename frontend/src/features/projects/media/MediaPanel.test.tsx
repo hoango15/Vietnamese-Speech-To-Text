@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { MediaPanel } from "./MediaPanel";
 import type { Media, Project } from "../../../shared/types";
+import { NoticeProvider } from "../../../shared/ui/NoticeProvider";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 let root: ReturnType<typeof createRoot>;
@@ -103,4 +104,94 @@ it("previews images and releases their object URLs on selection changes and unmo
   expect(host.querySelector("img")?.getAttribute("alt")).toBe("m2.png");
   await act(() => root.unmount());
   expect(revoke).toHaveBeenCalledWith("blob:image-2");
+});
+
+async function mountSourceActions({ canManage = true, disabled = false, failDelete = false } = {}) {
+  const requests: { url: string; method: string }[] = [];
+  vi.stubGlobal("fetch", async (url: string, options: RequestInit = {}) => {
+    requests.push({ url, method: options.method ?? "GET" });
+    if (url.endsWith("/playback")) return Response.json({ url: url.includes("/m2/") ? "/api/media/m2/stream" : "/api/media/m1/stream", expires_in: 300 });
+    if (url === "/api/media/m2/download") return new Response(new Blob(["audio"], { type: "audio/wav" }));
+    if (options.method === "DELETE") return failDelete
+      ? Response.json({ detail: "Không thể xóa tệp đang được xử lý." }, { status: 409 })
+      : Response.json({ ok: true });
+    return Response.json(url.endsWith("/capabilities") ? { asr: false, ocr: false } : { items: [], total: 0 });
+  });
+  const media: Media[] = ["m1", "m2"].map((id, index) => ({ media_file_id: id, project_id: "p1", media_kind_code: "ORIGINAL_AUDIO",
+    is_current: index === 0, mime_type: "audio/wav", file_name: id + ".wav", file_size_bytes: 1024,
+    duration_ms: 10000, created_at: "2026-11-16T00:00:00Z" }));
+  const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
+  const reload = vi.fn();
+  await act(async () => root.render(<MemoryRouter initialEntries={["/projects/p1?media=m2"]}><NoticeProvider>
+    <MediaPanel project={{ project_id: "p1", language_code: "vi", can_edit: false, can_manage: canManage } as Project}
+      media={media} loading={false} error="" reload={reload} disabled={disabled} />
+  </NoticeProvider></MemoryRouter>));
+  return { host, requests, reload };
+}
+
+it("downloads the selected source with its original filename", async () => {
+  const downloads: { filename: string; url: string }[] = [];
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:source-download");
+  vi.spyOn(URL, "revokeObjectURL");
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+    downloads.push({ filename: this.download, url: this.href });
+  });
+  const { host, requests } = await mountSourceActions({ canManage: false });
+  const button = [...host.querySelectorAll("button")].find(item => item.textContent?.includes("Tải xuống"));
+  expect(button, "Selected media must have a download action").toBeTruthy();
+  await act(async () => button!.click());
+  expect(downloads).toEqual([{ filename: "m2.wav", url: "blob:source-download" }]);
+  expect(requests).toContainEqual({ url: "/api/media/m2/download", method: "GET" });
+});
+
+it("deletes only the selected source after manager confirmation and refreshes media", async () => {
+  const confirm = vi.fn(() => true); vi.stubGlobal("confirm", confirm);
+  const { host, requests, reload } = await mountSourceActions();
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="Xóa tệp nguồn"]');
+  expect(button, "Managers must be able to remove the selected source").toBeTruthy();
+  await act(async () => button!.click());
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(requests.filter(item => item.method === "DELETE")).toEqual([{ url: "/api/media/m2", method: "DELETE" }]);
+  expect(reload).toHaveBeenCalledOnce();
+  expect(document.querySelector('[role="status"]')?.textContent).toContain("Đã xóa tệp");
+});
+
+it("keeps media unchanged when deletion is declined", async () => {
+  vi.stubGlobal("confirm", () => false);
+  const { host, requests, reload } = await mountSourceActions();
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="Xóa tệp nguồn"]');
+  expect(button, "Manager delete action is missing").toBeTruthy();
+  await act(async () => button!.click());
+  expect(requests.some(item => item.method === "DELETE")).toBe(false);
+  expect(reload).not.toHaveBeenCalled();
+  expect(host.querySelector<HTMLSelectElement>("select")?.value).toBe("m2");
+});
+
+it("keeps the selected source and displays server errors when deletion fails", async () => {
+  vi.stubGlobal("confirm", () => true);
+  const { host, reload } = await mountSourceActions({ failDelete: true });
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="Xóa tệp nguồn"]');
+  expect(button, "Manager delete action is missing").toBeTruthy();
+  await act(async () => button!.click());
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain("Không thể xóa tệp đang được xử lý.");
+  expect(reload).not.toHaveBeenCalled();
+  expect(host.querySelector<HTMLSelectElement>("select")?.value).toBe("m2");
+  expect(host.querySelector("audio")).not.toBeNull();
+});
+
+it("does not offer source deletion to a non-manager", async () => {
+  const { host, requests } = await mountSourceActions({ canManage: false });
+  expect(host.querySelector('[aria-label="Xóa tệp nguồn"]')).toBeNull();
+  expect(requests.some(item => item.method === "DELETE")).toBe(false);
+});
+
+it("blocks source deletion while source changes are locked", async () => {
+  const confirm = vi.fn(() => true); vi.stubGlobal("confirm", confirm);
+  const { host, requests } = await mountSourceActions({ disabled: true });
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="Xóa tệp nguồn"]');
+  expect(button, "Manager delete action is missing").toBeTruthy();
+  expect(button!.disabled).toBe(true);
+  await act(async () => button!.click());
+  expect(confirm).not.toHaveBeenCalled();
+  expect(requests.some(item => item.method === "DELETE")).toBe(false);
 });

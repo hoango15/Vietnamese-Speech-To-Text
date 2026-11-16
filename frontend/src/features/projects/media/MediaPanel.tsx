@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Play, RotateCw, UploadCloud } from "lucide-react";
+import { ArrowDownToLine, Play, RotateCw, Trash2, UploadCloud } from "lucide-react";
 import { api } from "../../../shared/api/client";
 import { message } from "../../../shared/lib/errors";
 import type { Media, Project } from "../../../shared/types";
 import { bytes, date, time } from "../../../shared/lib/format";
 import { ErrorBox, Loading } from "../../../shared/ui/components";
 import { ProcessPanel } from "./ProcessPanel";
+import { useAction } from "../../../shared/hooks/useAction";
 
 export function MediaPanel({ project, media, loading, error, reload, disabled = false, onProcessed }: {
   project: Project;
@@ -23,7 +24,8 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
     [blobLoading, setBlobLoading] = useState(false),
     [blobError, setBlobError] = useState(""),
     [attempt, setAttempt] = useState(0),
-    [rotation, setRotation] = useState(0);
+    [rotation, setRotation] = useState(0),
+    action = useAction();
   const sources = media.filter(item => item.media_kind_code.startsWith("ORIGINAL_"));
   const current = sources.find(item => item.media_file_id === selected) ?? sources.find(item => item.is_current) ?? sources[0];
   const url = source?.id === current?.media_file_id ? source?.url : "";
@@ -70,7 +72,7 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
     {loading ? <Loading /> : error ? <ErrorBox error={error} retry={reload} /> : !current ? <div className="source-empty">
       <UploadCloud size={32} /><p>Thêm tệp để bắt đầu</p><small>Video, âm thanh hoặc hình ảnh</small>
     </div> : <>
-      <select className="media-select" aria-label="Chọn tệp xem trước" disabled={disabled} value={current.media_file_id} onChange={event => {
+      <select className="media-select" aria-label="Chọn tệp xem trước" disabled={disabled || action.busy} value={current.media_file_id} onChange={event => {
         const id = event.target.value;
         setParams(previous => { const next = new URLSearchParams(previous); next.set("media", id); return next; });
       }}>
@@ -128,7 +130,26 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
           {" · " + date(current.created_at)}
         </small>
       </div>
-      <ProcessPanel key={current.media_file_id} project={project} media={current} disabled={disabled} onComplete={onProcessed ?? reload} />
+      <div className="row-actions">
+        <button className="button secondary small" disabled={action.busy} onClick={() =>
+          action.run(() => api.download(`/media/${current.media_file_id}/download`, current.file_name))}>
+          <ArrowDownToLine size={15} />Tải xuống
+        </button>
+        {project.can_manage && <button className="icon-button danger" aria-label="Xóa tệp nguồn"
+          disabled={disabled || action.busy} onClick={() => {
+            if (!confirm("Xóa tệp này? Các kết quả liên quan có thể không còn nguồn để phát.")) return;
+            action.run(async () => {
+              await api.request(`/media/${current.media_file_id}`, { method: "DELETE" });
+              setParams(previous => {
+                const next = new URLSearchParams(previous);
+                if (next.get("media") === current.media_file_id) next.delete("media");
+                return next;
+              });
+              reload();
+            }, "Đã xóa tệp.");
+          }}><Trash2 size={16} /></button>}
+      </div>
+      <ProcessPanel key={current.media_file_id} project={project} media={current} disabled={disabled || action.busy} onComplete={onProcessed ?? reload} />
     </>}
   </div>;
 }
