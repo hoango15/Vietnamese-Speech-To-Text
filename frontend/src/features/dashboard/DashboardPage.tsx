@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import type { Audit, AuditList, Project } from "../../shared/types";
 import { ProjectCards } from "../projects/components/ProjectCards";
 import { Link } from "react-router-dom";
-import { Activity, ArrowRight, AudioLines, Check, CheckCircle2, Clock3, FolderClosed } from "lucide-react";
+import { Activity, ArrowRight, AudioLines, Check, CheckCircle2, Clock3, FolderClosed, Trash2 } from "lucide-react";
 import { canCreateProject } from "../projects/lib/permissions";
 import { useResource } from "../../shared/hooks/useResource";
 import { bytes, date, time } from "../../shared/lib/format";
 import { Empty, ErrorBox, Loading, PageTitle, Pagination } from "../../shared/ui/components";
 import { useAuth } from "../auth/AuthProvider";
+import { useAuditDeletion } from "../activity/useAuditDeletion";
 import "./dashboard.css";
 
 export function DashboardPage() {
@@ -25,6 +26,7 @@ export function DashboardPage() {
     }>("/dashboard");
   const [activityPage, setActivityPage] = useState(1);
   const activity = useResource<AuditList>(`/audit-logs?page=${activityPage}&page_size=7`);
+  const deletion = useAuditDeletion(activity.reload);
   useEffect(() => {
     if (activity.loading || activity.error || !activity.data) return;
     const lastPage = Math.max(1, Math.ceil(activity.data.total / 7));
@@ -165,6 +167,8 @@ export function DashboardPage() {
                     </p>
                     <small><time dateTime={entry.occurred_at}>{date(entry.occurred_at)}</time></small>
                   </div>
+                  {entry.can_delete && <button className="button secondary small" aria-label={`Xóa nhật ký ${entry.audit_log_id}`}
+                    disabled={deletion.busy} onClick={() => deletion.remove(entry.audit_log_id)}><Trash2 size={14} /></button>}
                 </li>
               ))}
             </ol>

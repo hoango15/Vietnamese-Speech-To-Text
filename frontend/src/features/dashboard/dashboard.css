@@ -471,6 +471,8 @@
 }
 
 .activity-list { list-style: none; margin: 0; padding: 0; }
+.activity-card .activity-item > button { margin-left: auto; flex-shrink: 0; }
+.activity-card .pagination { flex-wrap: wrap; gap: 10px; }
 .activity-item > div { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 1300px) {
   .dashboard-columns { grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; }

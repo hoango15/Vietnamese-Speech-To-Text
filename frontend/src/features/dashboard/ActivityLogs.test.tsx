@@ -80,3 +80,45 @@ it("retries a failed activity request without losing dashboard statistics", asyn
   expect(host.querySelectorAll(".activity-item")).toHaveLength(1);
   expect(host.textContent).not.toContain("Activity unavailable");
 });
+
+it("confirms row deletion and corrects an emptied dashboard last page", async () => {
+  records = Array.from({ length: 8 }, (_, index) => entry(index + 1));
+  const host = await mount();
+  await act(async () => button("Sau").click());
+  expect(host.querySelector('[aria-label="Xóa nhật ký 8"]')).not.toBeNull();
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Xóa nhật ký 8"]')!.click());
+  expect(window.confirm).toHaveBeenCalled();
+  expect(requests).toContainEqual({ path: "/api/audit-logs/8", method: "DELETE" });
+  expect(host.textContent).toContain("7 kết quả · Trang 1/1");
+  expect(host.querySelectorAll(".activity-item")).toHaveLength(7);
+});
+
+it("keeps records when confirmation is canceled or deletion fails", async () => {
+  records = [entry(1)];
+  const host = await mount();
+  expect(host.querySelector('[aria-label="Xóa nhật ký 1"]')).not.toBeNull();
+  vi.mocked(window.confirm).mockReturnValue(false);
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Xóa nhật ký 1"]')!.click());
+  expect(requests.some(item => item.method === "DELETE")).toBe(false);
+  vi.mocked(window.confirm).mockReturnValue(true);
+  failDelete = true;
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Xóa nhật ký 1"]')!.click());
+  expect(host.querySelectorAll(".activity-item")).toHaveLength(1);
+  expect(host.textContent).toContain("Không xóa được nhật ký");
+});
+
+it("sends only one delete request for repeated clicks and refreshes the current dashboard page", async () => {
+  records = Array.from({ length: 10 }, (_, index) => entry(index + 1));
+  const host = await mount();
+  let finish!: () => void;
+  waitForDelete = new Promise<void>(resolve => { finish = resolve; });
+  const remove = host.querySelector<HTMLButtonElement>('[aria-label="Xóa nhật ký 1"]')!;
+  expect(remove).not.toBeNull();
+  await act(() => { remove.click(); remove.click(); });
+  expect(requests.filter(item => item.method === "DELETE")).toHaveLength(1);
+  await act(async () => button("Sau").click());
+  await act(async () => finish());
+  expect(requests.at(-1)?.path).toBe("/api/audit-logs?page=2&page_size=7");
+  expect(host.querySelectorAll(".activity-item")).toHaveLength(2);
+  expect(host.textContent).toContain("9 kết quả · Trang 2/2");
+});
