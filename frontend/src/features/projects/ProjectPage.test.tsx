@@ -21,7 +21,7 @@ async function mount(handler: (url: string, options: RequestInit) => Response | 
   api.setSession(null);
   window.history.replaceState(null, "", path);
   vi.stubGlobal("fetch", (url: string, options: RequestInit = {}) => Promise.resolve(url === "/api/auth/refresh"
-    ? Response.json(session) : url === "/api/projects/p1" ? Response.json({ ...project, ...details })
+    ? Response.json(session) : url === "/api/projects/p1" && options.method !== "PATCH" ? Response.json({ ...project, ...details })
     : url.endsWith("/playback") ? Response.json({ url: url.replace(/\/playback$/, "/stream"), expires_in: 300 }) : handler(url, options)));
   host = document.createElement("div"); document.body.append(host);
   root = createRoot(host);
@@ -152,6 +152,71 @@ it("hides file controls for deleted projects", async () => {
   expect(host.querySelector(".media-card")).toBeNull();
 });
 
+it("shows the selected source and project-only activity in the overview without losing media links", async () => {
+  await mount(url => {
+    if (url === "/api/projects/p1/media") return Response.json({ items: [media, { ...media, media_file_id: "m2", file_name: "selected.wav", is_current: false, duration_ms: 120000 }], total: 2 });
+    if (url.endsWith("/members")) return Response.json({ items: [{ user_id: "reader", full_name: "Người xem", permission: "VIEWER" }], total: 1 });
+    if (url.endsWith("/activities")) return Response.json({ items: [
+      { audit_log_id: "a1", entity_name: "project", entity_id: "p1", action_name: "CREATE", full_name: "Chủ dự án", occurred_at: project.created_at },
+      { audit_log_id: "a2", entity_name: "project", entity_id: "another", action_name: "FOREIGN_ACTIVITY", occurred_at: project.created_at },
+    ], total: 2 });
+    return Response.json({ items: [], total: 0 });
+  }, {}, "/projects/p1?tab=overview&media=m2");
+  const overview = host.querySelector(".project-overview");
+  expect(overview).not.toBeNull();
+  expect(overview?.textContent).toContain("selected.wav");
+  expect(overview?.textContent).toContain("00:02:00");
+  expect(overview?.querySelector('[aria-label="Phiên bản nguồn"]')?.textContent).toContain("2");
+  expect(overview?.textContent).toContain("Đã tạo dự án");
+  expect(overview?.textContent).not.toContain("FOREIGN_ACTIVITY");
+  expect(overview?.textContent).toContain("Người xem");
+  expect(overview?.querySelector('a[href="/projects/p1?tab=content&media=m2"]')).not.toBeNull();
+  expect(overview?.querySelector('a[href="/projects/p1?tab=jobs&media=m2"]')).not.toBeNull();
+});
+
+it("retries a failed overview activity request", async () => {
+  let failed = true;
+  await mount(url => url.endsWith("/activities") && failed
+    ? Response.json({ detail: "Không tải được hoạt động" }, { status: 503 })
+    : Response.json({ items: [], total: 0 }), {}, "/projects/p1?tab=overview");
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Không tải được hoạt động");
+  failed = false;
+  await act(() => [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Thử lại")!.click());
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(host.querySelector(".project-overview")?.textContent).toContain("Chưa có hoạt động gần đây");
+});
+
+it("edits project settings from the detail page and refreshes the saved title", async () => {
+  const details: Partial<Project> = {};
+  const writes: unknown[] = [];
+  await mount((url, options) => {
+    if (url === "/api/projects/p1" && options.method === "PATCH") {
+      const body = JSON.parse(String(options.body));
+      writes.push(body);
+      Object.assign(details, body);
+      return Response.json({ ...project, ...details });
+    }
+    return Response.json({ items: [], total: 0 });
+  }, details);
+  const settings = [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Cài đặt dự án");
+  expect(settings).toBeDefined();
+  await act(() => settings!.click());
+  const input = document.querySelector<HTMLInputElement>('dialog [name="project_title"]')!;
+  await act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Tên đã cập nhật");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    document.querySelector<HTMLFormElement>("dialog form")!.requestSubmit();
+  });
+  expect(writes).toEqual([{ project_title: "Tên đã cập nhật", project_description: "Nội dung nguồn", language_code: "vi", project_type: "AUDIO" }]);
+  expect(document.querySelector("dialog")).toBeNull();
+  expect(host.querySelector("main h1")?.textContent).toBe("Tên đã cập nhật");
+});
+
+it.each([{ can_manage: false }, { deleted_at: "2026-11-12T01:00:00Z" }])("hides detail settings when management is unavailable: %o", async details => {
+  await mount(undefined, details);
+  expect([...host.querySelectorAll("button")].some(button => button.textContent?.trim() === "Cài đặt dự án")).toBe(false);
+});
+
 it("protects a live recording from navigation and releases the microphone when leaving is confirmed", async () => {
   const browser = browserRecording();
   await mount(url => Response.json(url === "/api/projects/p1/media" ? { items: [media], total: 1 }
@@ -161,6 +226,10 @@ it("protects a live recording from navigation and releases the microphone when l
   expect(start).toBeDefined();
   await act(() => start!.click());
   expect(host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')?.disabled).toBe(true);
+  const settings = [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Cài đặt dự án")!;
+  expect(settings.disabled).toBe(true);
+  await act(() => settings.click());
+  expect(document.querySelector("dialog")).toBeNull();
   const unload = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(unload);
   expect(unload.defaultPrevented).toBe(true);
   const back = host.querySelector<HTMLAnchorElement>(".back-link")!;
