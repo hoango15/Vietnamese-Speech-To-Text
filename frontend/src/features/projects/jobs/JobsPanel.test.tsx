@@ -71,3 +71,33 @@ it("opens results for the successful history entry", async () => {
   await act(() => document.body.querySelector<HTMLButtonElement>('[aria-label="Đóng hộp thoại"]')!.click());
   expect(document.body.querySelector("dialog")).toBeNull();
 });
+
+it("closes historical results when switching projects", async () => {
+  const job: Job = { job_id: "old-job", project_id: "p1", media_file_id: "old-source", job_status_code: "SUCCEEDED",
+    progress_percent: 100, error_message: null, created_at: "2026-11-12T00:00:00Z", stages: [] };
+  vi.stubGlobal("fetch", async (url: string) => Response.json(url.endsWith("/results")
+    ? { media: { media_file_id: "old-source", file_name: "old.png" }, transcript: null, minutes: null, exports: [], ocr: { document_text: "Old result" } }
+    : { items: url.includes("/p1/") ? [job] : [], total: url.includes("/p1/") ? 1 : 0 }));
+  const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
+  const view = (id: string) => createMemoryRouter([{ path: "/", element: <JobsPanel project={{ ...project, project_id: id }} /> }]);
+  await act(async () => root.render(<RouterProvider router={view("p1")} />));
+  await act(() => [...host.querySelectorAll("button")].find(button => button.textContent === "Xem kết quả tác vụ")!.click());
+  expect(document.body.querySelector("dialog")?.textContent).toContain("Old result");
+  await act(async () => root.render(<RouterProvider router={view("p2")} />));
+  expect(document.body.querySelector("dialog")).toBeNull();
+});
+
+it("reloads history after canceling a job", async () => {
+  const job: Job = { job_id: "running-job", project_id: "p1", media_file_id: "source", job_status_code: "RUNNING",
+    progress_percent: 30, error_message: null, created_at: "2026-11-12T00:00:00Z", stages: [] };
+  const requests: string[] = [];
+  vi.stubGlobal("fetch", async (url: string) => {
+    requests.push(url);
+    return Response.json(url.endsWith("/cancel") ? { ...job, job_status_code: "CANCELED" } : { items: [job], total: 1 });
+  });
+  const router = createMemoryRouter([{ path: "/", element: <JobsPanel project={project} /> }]);
+  const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
+  await act(async () => root.render(<RouterProvider router={router} />));
+  await act(() => [...host.querySelectorAll("button")].find(button => button.textContent === "Hủy xử lý")!.click());
+  expect(requests.filter(url => url.includes("/projects/p1/jobs"))).toHaveLength(2);
+});
