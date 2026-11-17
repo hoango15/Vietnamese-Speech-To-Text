@@ -242,3 +242,52 @@ it("protects a live recording from navigation and releases the microphone when l
   expect(window.location.pathname).toBe("/projects");
   expect(browser.tracks[0].stop).toHaveBeenCalled();
 });
+
+async function mountTranscript(requests: string[] = [], path = "/projects/p1?tab=transcript&media=m2") {
+  await mount(url => {
+    requests.push(url);
+    if (url === "/api/projects/p1/media") return Response.json({ items: [media, { ...media, media_file_id: "m2", file_name: "selected.wav", is_current: false }], total: 2 });
+    if (url === "/api/system/capabilities") return Response.json({ asr: false, ocr: false, diarization: false, llm: false, grammar: false, asr_model: "", max_upload_bytes: 1024 });
+    if (url === "/api/projects/p1/transcripts/current?media_file_id=m2") return Response.json({
+      transcript_id: "t2", project_id: "p1", media_file_id: "m2", version_no: 1, revision: 1,
+      segments: [{ segment_id: "s2", start_ms: 12500, end_ms: 15000, segment_text: "Nội dung tệp đã chọn", speaker_id: null }], speakers: [],
+    });
+    if (url === "/api/projects/p1/transcripts?media_file_id=m2") return Response.json({ items: [{ transcript_id: "t2", media_file_id: "m2", version_no: 1, is_current: true, created_at: project.created_at }], total: 1 });
+    return Response.json({ items: [], total: 0 });
+  }, {}, path);
+}
+
+it.each(["/projects/p1?tab=transcript&media=m2", "/projects/p1?tab=content&media=m2&t=1250"])("loads the selected media transcript and seeks its source from a segment timestamp: %s", async path => {
+  const requests: string[] = [];
+  await mountTranscript(requests, path);
+  expect(requests).toContain("/api/projects/p1/transcripts/current?media_file_id=m2");
+  expect(host.querySelector<HTMLTextAreaElement>(".segment textarea")?.value).toBe("Nội dung tệp đã chọn");
+  expect(host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')?.value).toBe("m2");
+  expect([...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Bản ghi")?.getAttribute("aria-pressed")).toBe("true");
+  const audio = host.querySelector<HTMLAudioElement>("audio")!;
+  expect(audio).not.toBeNull();
+  if (path.includes("t=1250")) {
+    await act(() => audio.dispatchEvent(new Event("loadedmetadata")));
+    expect(audio.currentTime).toBe(1.25);
+  }
+  await act(() => host.querySelector<HTMLButtonElement>(".timestamp")!.click());
+  expect(audio.currentTime).toBe(12.5);
+});
+
+it("keeps an unsaved transcript when leaving is cancelled and disables source changes", async () => {
+  await mountTranscript();
+  const textarea = host.querySelector<HTMLTextAreaElement>(".segment textarea");
+  expect(textarea).not.toBeNull();
+  await act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "Bản nháp chưa lưu");
+    textarea!.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')?.disabled).toBe(true);
+  expect(host.querySelector<HTMLButtonElement>('[aria-label="Xóa tệp nguồn"]')?.disabled).toBe(true);
+  const confirm = vi.fn(() => false);
+  vi.stubGlobal("confirm", confirm);
+  await act(() => [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Tệp nguồn")!.click());
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(window.location.search).toContain("tab=transcript");
+  expect(host.querySelector<HTMLTextAreaElement>(".segment textarea")?.value).toBe("Bản nháp chưa lưu");
+});

@@ -99,3 +99,11 @@ Lưu ý kiểm tra nhánh: commit nền `844b58d` đã có `src/features/admin/A
 Sau đăng ký thành công, giao diện chuyển về đăng nhập. Mật khẩu đăng ký dài 10–128 ký tự, có ít nhất một chữ A–Z và một chữ số. Khi triển khai bản build, cấu hình máy chủ phục vụ `index.html` cho các đường dẫn giao diện và chuyển tiếp `/api` tới máy chủ xác thực.
 
 Kiểm thử frontend dùng phản hồi API giả lập, không tạo tài khoản trên máy chủ thật. Không kèm backend, cơ sở dữ liệu, `.env`, tài khoản thật hoặc thư mục cài đặt thư viện.
+
+## Transcript editor: section 8, first delivery
+
+Open a project and choose **Bản ghi** to read and edit the transcript for the selected audio/video source. The editor supports timestamp seeking, segment validation, add/split/merge/delete, speaker controls, saving with revision checks, and version history. Read-only projects keep editing controls disabled. Unsaved transcript or recording drafts are protected when leaving the page; active uploads remain mounted.
+
+Search links using `?tab=content&media=<id>&t=<milliseconds>` open the matching transcript and seek the selected media after metadata loads. The dedicated transcript tab uses `?tab=transcript`.
+
+This delivery requires the matching transcript, speaker and media APIs. Personal bookmarks remain for a later section 8 delivery. OCR, meeting minutes, notifications and payment modules are outside this delivery.

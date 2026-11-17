@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowDownToLine, Play, RotateCw, Trash2, UploadCloud } from "lucide-react";
 import { api } from "../../../shared/api/client";
@@ -9,7 +9,7 @@ import { ErrorBox, Loading } from "../../../shared/ui/components";
 import { ProcessPanel } from "./ProcessPanel";
 import { useAction } from "../../../shared/hooks/useAction";
 
-export function MediaPanel({ project, media, loading, error, reload, disabled = false, onProcessed }: {
+export function MediaPanel({ project, media, loading, error, reload, disabled = false, onProcessed, mediaRef }: {
   project: Project;
   media: Media[];
   loading: boolean;
@@ -17,6 +17,7 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
   reload: () => void;
   disabled?: boolean;
   onProcessed?: () => void;
+  mediaRef?: RefObject<HTMLVideoElement | HTMLAudioElement | null>;
 }) {
   const [params, setParams] = useSearchParams();
   const selected = params.get("media") ?? "";
@@ -101,10 +102,15 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
                   </>
                 ) : current.mime_type.startsWith("video/") ? (
                   <video
+                    ref={element => { if (mediaRef) mediaRef.current = element; }}
                     controls
                     src={url}
                     preload="metadata"
                     aria-label="Video nguồn"
+                    onLoadedMetadata={event => {
+                      const at = Number(params.get("t"));
+                      if (params.has("t") && Number.isFinite(at) && at >= 0) event.currentTarget.currentTime = at / 1000;
+                    }}
                     onError={() => setBlobError("Không phát được video. Hãy thử lại hoặc tải tệp xuống.")}
                   />
                 ) : (
@@ -113,10 +119,15 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
                       <Play size={28} />
                     </div>
                     <audio
+                      ref={element => { if (mediaRef) mediaRef.current = element; }}
                       controls
                       src={url}
                       preload="metadata"
                       aria-label="Âm thanh nguồn"
+                      onLoadedMetadata={event => {
+                        const at = Number(params.get("t"));
+                        if (params.has("t") && Number.isFinite(at) && at >= 0) event.currentTarget.currentTime = at / 1000;
+                      }}
                       onError={() => setBlobError("Không phát được âm thanh. Hãy thử lại hoặc tải tệp xuống.")}
                     />
                   </div>
