@@ -45,7 +45,14 @@ Sau đăng nhập, Dashboard gọi `GET /api/dashboard` và hiển thị tổng 
 
 Dashboard có xóa từng nhật ký và **Xóa tất cả** nhật ký được phép xóa trên mọi trang. Cả hai thao tác đều yêu cầu xác nhận, không thể hoàn tác qua giao diện. Nút xóa từng dòng chỉ xuất hiện khi API trả `can_delete`; xóa tất cả bị khóa khi không có quyền, đang tải/xóa hoặc tải lỗi. Xóa thành công sẽ tải lại trang hiện tại và lùi về trang còn dữ liệu nếu trang cuối đã hết. Hủy xác nhận hoặc yêu cầu lỗi không tự xóa bản ghi trên giao diện.
 
-Các mục từ điển, tìm kiếm, thanh toán, hồ sơ, thông báo và cài đặt chưa được đưa vào bản này. Ô tìm kiếm trên header chuyển tới `/search?q=...`; chưa tải kết quả tìm kiếm.
+Từ điển thuật ngữ gọi `GET /api/glossaries?q=...&page=...&page_size=20`, `POST /api/glossaries`, `PATCH /api/glossaries/{term_id}` và `DELETE /api/glossaries/{term_id}`. Mỗi thuật ngữ có `term_id`, `term`, `definition`, `language_code`, `category` và `updated_at`; danh sách theo kiểu `{ items, total }`.
+
+Tìm kiếm bản chép lời gọi `GET /api/search/transcripts?q=...&page=...&page_size=20`; kết quả theo kiểu `{ items, total }`, mỗi dòng có `project_id`, `project_title`, `media_file_id`, `segment_no`, `start_ms`, `end_ms`, `segment_text` và tùy chọn `segment_id`, `speaker_name`. Backend phải giới hạn kết quả theo quyền truy cập dự án của tài khoản.
+
+Hồ sơ gọi `GET /api/users/me` và `PATCH /api/users/me` với `{ full_name }`; phản hồi dùng kiểu `User`. Cài đặt mật khẩu gọi `PATCH /api/auth/password` với `{ current_password, new_password }`. Các endpoint này cần được hỗ trợ bởi backend để lưu dữ liệu thật; frontend hiển thị lỗi API nếu máy chủ chưa triển khai.
+
+Các mục thư viện biên bản/phụ đề, kho tệp, thanh toán, thông báo và quản trị hiện vẫn có màn hình chờ bổ sung. Ô tìm kiếm trên header chuyển tới trang tìm kiếm bản chép lời.
+Các mục từ điển và tìm kiếm đã có giao diện và gọi API riêng. Hồ sơ và cài đặt tài khoản được triển khai trong commit tiếp theo.
 
 Thẻ dự án dẫn tới `/projects/:projectId`. Chọn tệp nguồn để xem trước và bắt đầu xử lý; giao diện kiểm tra quyền sửa, khả năng máy chủ và tác vụ đang chạy trước khi cho gửi yêu cầu. Trạng thái tác vụ cập nhật mỗi 2 giây, đồng hồ xử lý cập nhật mỗi giây và dừng khi tác vụ kết thúc. API vẫn phải kiểm tra quyền và ngăn tác vụ trùng trên máy chủ.
 
