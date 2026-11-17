@@ -352,16 +352,33 @@ it("navigates between workspace sections and marks only the active sidebar link"
   expect(fetchMock).toHaveBeenCalledTimes(3);
 });
 
-it("routes header search with trimmed query text without fabricating search results", async () => {
+it("routes header search and loads transcript matches for the trimmed query", async () => {
   fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+    if (url.startsWith("/api/search/transcripts?")) return Response.json({
+      items: [{
+        project_id: "project-1", project_title: "Cuộc họp tuần", media_file_id: "media-1",
+        segment_no: 2, start_ms: 65000, end_ms: 69000, segment_text: "Tiếng Việt và phụ đề",
+        speaker_name: "Nguyễn An",
+      }],
+      total: 1,
+    });
+    return defaultFetch(url, options);
+  });
   expect(host.querySelector(".top-search")).not.toBeNull();
   await fill('.top-search input', "  tiếng Việt & phụ đề  ");
   await act(async () => host.querySelector<HTMLFormElement>(".top-search")!.requestSubmit());
   expect(window.location.pathname).toBe("/search");
   expect(new URLSearchParams(window.location.search).get("q")).toBe("tiếng Việt & phụ đề");
   expect(host.querySelector("main h1")?.textContent).toBe("Tìm kiếm nội dung");
-  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(host.querySelector(".search-result")?.textContent).toContain("Tiếng Việt và phụ đề");
+  expect(host.querySelector(".search-result")?.textContent).toContain("00:01:05");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toContain(
+    "/api/search/transcripts?q=ti%E1%BA%BFng%20Vi%E1%BB%87t%20%26%20ph%E1%BB%A5%20%C4%91%E1%BB%81&page=1&page_size=20",
+  );
+  expect(fetchMock).toHaveBeenCalledTimes(4);
 });
 
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {

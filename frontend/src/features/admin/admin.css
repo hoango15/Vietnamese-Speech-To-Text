@@ -1,0 +1,2 @@
+.admin-console { display: flex; flex-direction: column; gap: 20px; }
+.admin-console-tabs { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
