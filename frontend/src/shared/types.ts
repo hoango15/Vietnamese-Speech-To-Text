@@ -126,6 +126,14 @@ export interface Transcript {
   speakers: Speaker[];
 }
 
+export interface TranscriptVersion {
+  media_file_id?: string | null;
+  transcript_id: string;
+  version_no: number;
+  created_at: string;
+  is_current: boolean;
+}
+
 export interface Minutes {
   media_file_id?: string | null;
   minutes_id: string;
