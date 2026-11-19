@@ -17,4 +17,7 @@
 .settings-intro h2 { color: var(--heading); }
 .settings-intro p { color: var(--muted); margin-top: 4px; }
 .account-validation { color: #a63d3d; }
+.password-requirements { list-style: none; padding: 0; margin: -8px 0 0; display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 11px; }
+.password-rule { display: flex; align-items: center; gap: 5px; }
+.password-rule.valid { color: #217754; }
 @media(max-width:600px) { .account-readonly { flex-wrap: wrap; } .account-readonly small { width: 100%; margin-left: 24px; } }

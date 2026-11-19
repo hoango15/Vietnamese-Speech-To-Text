@@ -514,6 +514,10 @@ it("reveals and hides each password field independently in account settings", as
   expect(current.type).toBe("password");
   await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Ẩn mật khẩu mới"]')!.click());
   expect(next.type).toBe("password");
+  await fill('[aria-label="Mật khẩu mới"]', "abcdefghij");
+  expect(host.querySelectorAll(".password-rule.valid")).toHaveLength(1);
+  await fill('[aria-label="Mật khẩu mới"]', "Abcdefghij1");
+  expect(host.querySelectorAll(".password-rule.valid")).toHaveLength(3);
 });
 
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
