@@ -35,6 +35,9 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
   const current = sources.find(item => item.media_file_id === selected) ?? sources.find(item => item.is_current) ?? sources[0];
   const url = source?.id === current?.media_file_id ? source?.url : "";
   useEffect(() => {
+    if (loading || error) setReadyMedia(null);
+  }, [loading, error]);
+  useEffect(() => {
     setSource(null);
     setBlobError("");
     setReadyMedia(null);
