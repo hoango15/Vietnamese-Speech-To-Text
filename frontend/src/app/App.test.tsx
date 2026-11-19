@@ -395,6 +395,10 @@ it("routes header search and loads transcript matches for the trimmed query", as
   await choose('[aria-label="Lọc kết quả theo dự án"]', "project-2");
   expect(host.querySelector(".search-result-body > a strong")?.textContent).toBe("Dự án lọc");
   expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/search/transcripts?q=ti%E1%BA%BFng%20Vi%E1%BB%87t%20%26%20ph%E1%BB%A5%20%C4%91%E1%BB%81&page=1&page_size=20&project_id=project-2");
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Xóa nội dung tìm kiếm"]')!.click());
+  expect(window.location.search).toBe("");
+  expect(host.querySelector(".search-result")).toBeNull();
+  expect(host.querySelector(".empty")?.textContent).toContain("Nhập từ khóa");
 });
 
 it("loads notifications and marks a selected item as read", async () => {
