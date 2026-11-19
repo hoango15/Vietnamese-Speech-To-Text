@@ -8,5 +8,6 @@
 .search-result-body { min-width: 0; flex: 1; }
 .search-result-body > a { color: var(--teal); }
 .search-result-body p { margin: 6px 0; color: #364154; white-space: pre-wrap; }
+.search-result-body mark { background: #fff0b8; color: inherit; border-radius: 2px; padding: 0 1px; }
 .search-result-body small { display: flex; align-items: center; gap: 5px; color: var(--muted); }
 @media(max-width:600px) { .transcript-search-form { flex-wrap: wrap; } .transcript-search-form input { min-width: calc(100% - 35px); } }
