@@ -406,11 +406,13 @@ it("loads notifications and marks a selected item as read", async () => {
   expect(host.querySelector("main h1")?.textContent).toBe("Thông báo");
   expect(host.querySelector(".notification-item")?.textContent).toContain("An đã cập nhật cuộc họp tuần.");
   expect(host.querySelector('.notification-project[href="/projects/project-1?tab=content&media=media-1&t=65000"]')?.textContent).toContain("Cuộc họp tuần");
+  expect(host.querySelector(".notification-count-badge")?.textContent).toBe("1");
   await click("Đánh dấu đã đọc");
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
   expect(fetchMock.mock.calls.map(([url, options]) => [url, (options as RequestInit | undefined)?.method]))
     .toContainEqual(["/api/notifications/notification-1/read", "PATCH"]);
   expect(host.querySelector(".notification-item")?.classList.contains("is-read")).toBe(true);
+  expect(host.querySelector(".notification-count-badge")).toBeNull();
 });
 
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {

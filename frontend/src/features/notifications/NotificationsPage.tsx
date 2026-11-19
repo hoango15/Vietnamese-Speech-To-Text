@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bell, CheckCheck, ExternalLink } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../shared/api/client";
@@ -32,6 +32,9 @@ export function NotificationsPage() {
   const unreadOnly = params.get("unread") === "true";
   const path = `/notifications?unread_only=${unreadOnly}&page=${page}&page_size=20`;
   const resource = useResource<NotificationPage>(path), action = useAction();
+  useEffect(() => {
+    if (resource.data) window.dispatchEvent(new CustomEvent("notifications:unread-count", { detail: resource.data.unread_count }));
+  }, [resource.data?.unread_count]);
   const selectFilter = (unread: boolean) => {
     const next = new URLSearchParams();
     if (unread) next.set("unread", "true");
@@ -43,6 +46,7 @@ export function NotificationsPage() {
     <PageTitle title="Thông báo" subtitle="Theo dõi cập nhật về dự án và hoạt động trong workspace.">
       <button className="button secondary" disabled={action.busy || !resource.data?.unread_count} onClick={() => action.run(async () => {
         await api.request("/notifications/read-all", { method: "POST" });
+        window.dispatchEvent(new CustomEvent("notifications:unread-count", { detail: 0 }));
         resource.reload();
       }, "Đã đánh dấu tất cả thông báo là đã đọc.")}><CheckCheck size={16} />Đánh dấu tất cả đã đọc</button>
     </PageTitle>
@@ -61,6 +65,7 @@ export function NotificationsPage() {
           </div>
           {!item.read_at && <button className="button secondary small notification-read" disabled={action.busy} onClick={() => action.run(async () => {
             await api.request(`/notifications/${encodeURIComponent(item.notification_id)}/read`, { method: "PATCH" });
+            window.dispatchEvent(new CustomEvent("notifications:unread-count", { detail: Math.max(0, resource.data!.unread_count - 1) }));
             resource.reload();
           }, "Đã đánh dấu thông báo là đã đọc.")}>Đánh dấu đã đọc</button>}
         </article>)}</div>

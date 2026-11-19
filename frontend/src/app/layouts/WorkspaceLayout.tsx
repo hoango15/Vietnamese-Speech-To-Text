@@ -11,10 +11,24 @@ export function WorkspaceLayout() {
   const [mobile, setMobile] = useState(false);
   const [compact, setCompact] = useState(() => window.matchMedia("(max-width: 760px)").matches);
   const [q, setQ] = useState("");
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const sidebarRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setUnreadNotifications(Math.max(0, user?.unread_notification_count ?? 0));
+  }, [user?.unread_notification_count]);
+
+  useEffect(() => {
+    const updateCount = (event: Event) => {
+      const count = (event as CustomEvent<number>).detail;
+      if (typeof count === "number" && Number.isFinite(count)) setUnreadNotifications(Math.max(0, count));
+    };
+    window.addEventListener("notifications:unread-count", updateCount);
+    return () => window.removeEventListener("notifications:unread-count", updateCount);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 760px)");
@@ -155,6 +169,7 @@ export function WorkspaceLayout() {
             </form>
             <Link className="notification-button icon-button" to="/notifications" aria-label="Thông báo">
               <Bell size={20} />
+              {unreadNotifications > 0 && <span className="notification-count-badge" aria-label={`${unreadNotifications} thông báo chưa đọc`}>{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
             </Link>
             <span className="header-divider" />
             <Link to="/profile" aria-label="Hồ sơ của tôi"><Avatar name={user.full_name} /></Link>

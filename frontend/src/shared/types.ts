@@ -9,6 +9,7 @@ export interface User {
   company_id?: string | null;
   company_name?: string | null;
   company_projects_enabled?: boolean;
+  unread_notification_count?: number;
 }
 export interface Session {
   access_token: string;
