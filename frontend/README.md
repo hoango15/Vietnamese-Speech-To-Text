@@ -31,6 +31,7 @@ npm run build
 - `src/features/projects/media/`: xem trước nguồn, upload chia phần, ghi âm và bắt đầu xử lý tệp đã chọn.
 - `src/features/projects/jobs/`: tiến độ, thời gian, các giai đoạn, hủy/thử lại, lịch sử và kết quả riêng của từng tác vụ.
 - `src/features/projects/exports/`: xuất tệp và phụ đề video.
+- `src/features/projects/bookmarks/`: dấu mốc và ghi chú cá nhân theo từng tệp âm thanh/video; tạo, sửa, xóa và tua đến thời điểm đã lưu.
 - `src/features/library/`, `src/features/files/`: thư viện kết quả, kho tệp và xem nhanh.
 - `src/shared/hooks/useResource.ts`: tải dữ liệu có hủy yêu cầu khi rời trang, báo lỗi và thử lại.
 - `src/shared/`: API client, kiểu dữ liệu, hook tác vụ, thông báo và CSS dùng chung từ dự án gốc.
@@ -55,6 +56,10 @@ Các mục thư viện biên bản/phụ đề, kho tệp, thanh toán, thông b
 Các mục từ điển và tìm kiếm đã có giao diện và gọi API riêng. Hồ sơ và cài đặt tài khoản được triển khai trong commit tiếp theo.
 
 Thẻ dự án dẫn tới `/projects/:projectId`. Chọn tệp nguồn để xem trước và bắt đầu xử lý; giao diện kiểm tra quyền sửa, khả năng máy chủ và tác vụ đang chạy trước khi cho gửi yêu cầu. Trạng thái tác vụ cập nhật mỗi 2 giây, đồng hồ xử lý cập nhật mỗi giây và dừng khi tác vụ kết thúc. API vẫn phải kiểm tra quyền và ngăn tác vụ trùng trên máy chủ.
+
+**Dấu mốc cá nhân** nằm dưới trình phát trong tab Tệp nguồn và Bản ghi. Sau khi tệp tải metadata, bấm **Đánh dấu thời điểm hiện tại**, nhập ghi chú rồi lưu. Bấm thời điểm của dấu mốc để tua đúng tệp; đổi nguồn sẽ tải danh sách riêng và bỏ form dấu mốc đang nhập. Người chỉ có quyền xem dự án vẫn tạo, sửa và xóa dấu mốc của mình. Tệp ảnh không có dấu mốc thời gian.
+
+Dấu mốc dùng `GET /api/projects/{id}/bookmarks?media_file_id={media_id}`, `POST /api/projects/{id}/bookmarks`, `PATCH /api/projects/{id}/bookmarks/{bookmark_id}` và `DELETE /api/projects/{id}/bookmarks/{bookmark_id}`. POST gửi `{ media_file_id, timestamp_ms, note }`; PATCH gửi `{ timestamp_ms, note }`. Thời điểm tính bằng mili giây, nằm trong thời lượng tệp khi đã biết; ghi chú tối đa 2.000 ký tự. Backend phải kiểm tra quyền truy cập dự án và chỉ trả/sửa dấu mốc của tài khoản hiện tại. Lỗi lưu giữ nguyên form, lỗi xóa giữ nguyên dấu mốc và có xác nhận trước khi xóa.
 
 Tab **Lịch sử xử lý** giữ bộ lọc tên tệp/mã tác vụ, trạng thái và trang trong URL. Tác vụ thành công có nút **Xem kết quả tác vụ**; bản ghi, OCR, biên bản và tệp tải xuống lấy từ lần xử lý đó, không thay bằng nguồn đang được chọn. Đây là màn hình đọc kết quả; các trình biên tập transcript, OCR và biên bản chưa nằm trong bản này.
 

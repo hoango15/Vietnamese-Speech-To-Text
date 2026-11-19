@@ -119,7 +119,7 @@ it("uploads a selected source, shows completion and reloads the server-provided 
   await mount((url, options) => {
     requests.push({ url, method: options.method ?? "GET", body: options.body });
     if (url === "/api/system/capabilities") return Response.json({ asr: false, ocr: false, diarization: false, llm: false, asr_model: "", max_upload_bytes: 1024 });
-    if (url === "/api/projects/p1/jobs" || url.startsWith("/api/glossaries")) return Response.json({ items: [], total: 0 });
+    if (url === "/api/projects/p1/jobs" || url.includes("/bookmarks") || url.startsWith("/api/glossaries")) return Response.json({ items: [], total: 0 });
     if (url === "/api/projects/p1/media") return Response.json({ items: completed ? [media] : [], total: completed ? 1 : 0 });
     if (url === "/api/uploads/u1/complete") { completed = true; return Response.json(media); }
     if (options.method === "PATCH") offset += (options.body as Blob).size;
@@ -290,4 +290,79 @@ it("keeps an unsaved transcript when leaving is cancelled and disables source ch
   expect(confirm).toHaveBeenCalledOnce();
   expect(window.location.search).toContain("tab=transcript");
   expect(host.querySelector<HTMLTextAreaElement>(".segment textarea")?.value).toBe("Bản nháp chưa lưu");
+});
+
+it("lets viewers mark the selected media after metadata loads and seek their private notes", async () => {
+  const writes: unknown[] = [];
+  let notes: Record<string, unknown>[] = [];
+  await mount((url, options) => {
+    if (url === "/api/projects/p1/media") return Response.json({ items: [media], total: 1 });
+    if (url.includes("/transcripts/current")) return Response.json({ detail: "Chưa có bản ghi" }, { status: 404 });
+    if (url.includes("/bookmarks")) {
+      if (options.method === "POST") {
+        const body = JSON.parse(String(options.body));
+        writes.push(body);
+        notes = [{ bookmark_id: "b1", ...body }];
+        return Response.json(notes[0], { status: 201 });
+      }
+      return Response.json({ items: notes, total: notes.length });
+    }
+    return Response.json({ items: [], total: 0 });
+  }, { can_manage: false, can_edit: false }, "/projects/p1?tab=transcript&media=m1");
+  const mark = [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Đánh dấu thời điểm hiện tại"));
+  expect(mark).toBeDefined();
+  expect(mark!.disabled).toBe(true);
+  expect(host.querySelector('input[type="file"]')).toBeNull();
+  const audio = host.querySelector<HTMLAudioElement>("audio")!;
+  audio.currentTime = 12.345;
+  await act(() => audio.dispatchEvent(new Event("loadedmetadata")));
+  expect(mark!.disabled).toBe(false);
+  await act(() => mark!.click());
+  const form = host.querySelector<HTMLFormElement>(".bookmark-form")!;
+  await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(writes).toEqual([{ media_file_id: "m1", timestamp_ms: 12345, note: "" }]);
+  audio.currentTime = 0;
+  await act(() => host.querySelector<HTMLButtonElement>('[aria-label="Mở dấu mốc tại 00:00:12"]')!.click());
+  expect(audio.currentTime).toBe(12.345);
+  await act(() => audio.dispatchEvent(new Event("error")));
+  expect(mark!.disabled).toBe(true);
+});
+
+it("resets bookmark drafts and readiness when selecting another audio or video source", async () => {
+  const requests: string[] = [];
+  await mount(url => {
+    requests.push(url);
+    if (url === "/api/projects/p1/media") return Response.json({ items: [media, { ...media, media_file_id: "m2", media_kind_code: "ORIGINAL_VIDEO", mime_type: "video/mp4", file_name: "second.mp4", is_current: false }], total: 2 });
+    if (url.includes("/bookmarks")) return Response.json({ items: [{ bookmark_id: "b1", media_file_id: "m1", timestamp_ms: 1000, note: "Ghi chú nguồn một" }], total: 1 });
+    return Response.json({ items: [], total: 0 });
+  });
+  const audio = host.querySelector<HTMLAudioElement>("audio")!;
+  await act(() => audio.dispatchEvent(new Event("loadedmetadata")));
+  const mark = () => [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Đánh dấu thời điểm hiện tại"))!;
+  expect(mark()).toBeDefined();
+  await act(() => mark().click());
+  expect(host.querySelector(".bookmark-form")).not.toBeNull();
+  const select = host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')!;
+  await act(() => { select.value = "m2"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(requests).toContain("/api/projects/p1/bookmarks?media_file_id=m2");
+  expect(host.querySelector(".bookmark-form")).toBeNull();
+  expect(host.textContent).not.toContain("Ghi chú nguồn một");
+  expect(mark().disabled).toBe(true);
+  const video = host.querySelector<HTMLVideoElement>("video")!;
+  await act(() => video.dispatchEvent(new Event("loadedmetadata")));
+  expect(mark().disabled).toBe(false);
+  await act(() => video.dispatchEvent(new Event("emptied")));
+  expect(mark().disabled).toBe(true);
+});
+
+it("does not offer timestamped bookmarks for image sources", async () => {
+  const requests: string[] = [];
+  await mount(url => {
+    requests.push(url);
+    if (url === "/api/projects/p1/media") return Response.json({ items: [{ ...media, mime_type: "image/png", media_kind_code: "ORIGINAL_IMAGE", file_name: "image.png" }], total: 1 });
+    if (url.endsWith("/download")) return new Response(new Blob(["image"], { type: "image/png" }));
+    return Response.json({ items: [], total: 0 });
+  });
+  expect(host.querySelector(".bookmarks-panel")).toBeNull();
+  expect(requests.some(url => url.includes("/bookmarks"))).toBe(false);
 });
