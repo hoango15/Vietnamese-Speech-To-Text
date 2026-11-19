@@ -21,7 +21,10 @@ interface AppNotification {
   media_file_id?: string | null;
   start_ms?: number | null;
 }
-type NotificationPage = List<AppNotification> & { unread_count: number };
+type NotificationPage = List<AppNotification> & {
+  unread_count: number;
+  notification_types?: { code: string; label: string }[];
+};
 
 export function NotificationsPage() {
   const [params, setParams] = useSearchParams();
@@ -30,17 +33,30 @@ export function NotificationsPage() {
     return Number.isSafeInteger(value) && value > 0 ? value : 1;
   });
   const unreadOnly = params.get("unread") === "true";
-  const path = `/notifications?unread_only=${unreadOnly}&page=${page}&page_size=20`;
+  const typeCode = params.get("type") ?? "";
+  const path = `/notifications?unread_only=${unreadOnly}&page=${page}&page_size=20${typeCode ? `&type_code=${encodeURIComponent(typeCode)}` : ""}`;
   const resource = useResource<NotificationPage>(path), action = useAction();
   useEffect(() => {
     if (resource.data) window.dispatchEvent(new CustomEvent("notifications:unread-count", { detail: resource.data.unread_count }));
   }, [resource.data?.unread_count]);
   const selectFilter = (unread: boolean) => {
-    const next = new URLSearchParams();
+    const next = new URLSearchParams(params);
     if (unread) next.set("unread", "true");
+    else next.delete("unread");
+    next.delete("page");
     setParams(next);
     setPage(1);
   };
+  const selectType = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set("type", value); else next.delete("type");
+    setParams(next);
+    setPage(1);
+  };
+  const notificationTypes = [...(resource.data?.notification_types ?? [...new Set(resource.data?.items.map(item => item.notification_type_code) ?? [])]
+    .map(code => ({ code, label: code.toLocaleLowerCase().replaceAll("_", " ") })))];
+  if (typeCode && !notificationTypes.some(type => type.code === typeCode))
+    notificationTypes.push({ code: typeCode, label: typeCode.toLocaleLowerCase().replaceAll("_", " ") });
 
   return <>
     <PageTitle title="Thông báo" subtitle="Theo dõi cập nhật về dự án và hoạt động trong workspace.">
@@ -54,6 +70,7 @@ export function NotificationsPage() {
       <div className="toolbar notification-filters" aria-label="Lọc thông báo">
         <button className={`button ${unreadOnly ? "secondary" : ""}`} aria-pressed={!unreadOnly} onClick={() => selectFilter(false)}>Tất cả</button>
         <button className={`button ${unreadOnly ? "" : "secondary"}`} aria-pressed={unreadOnly} onClick={() => selectFilter(true)}>Chưa đọc{resource.data ? ` (${resource.data.unread_count})` : ""}</button>
+        {(notificationTypes.length > 1 || Boolean(typeCode)) && <label className="notification-type-label">Loại thông báo<select aria-label="Lọc theo loại thông báo" value={typeCode} onChange={event => selectType(event.target.value)}><option value="">Mọi loại</option>{notificationTypes.map(type => <option key={type.code} value={type.code}>{type.label}</option>)}</select></label>}
       </div>
       {resource.error ? <ErrorBox error={resource.error} retry={resource.reload} /> : resource.loading && !resource.data ? <Loading /> : resource.data?.items.length ? <>
         <div className="notification-list">{resource.data.items.map(item => <article className={`notification-item ${item.read_at ? "is-read" : "is-unread"}`} key={item.notification_id}>

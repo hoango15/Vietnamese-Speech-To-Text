@@ -1,5 +1,7 @@
 .notifications-page { display: flex; flex-direction: column; gap: 18px; }
 .notification-filters { margin: 0; }
+.notification-type-label { margin-left: auto; min-width: 180px; }
+.notification-type-label select { font: inherit; color: #364154; border: 1px solid #dfe5ec; border-radius: 8px; padding: 9px 11px; background: white; }
 .notification-list { display: grid; gap: 10px; }
 .notification-item { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; }
 .notification-item.is-unread { background: #f5fbfa; border-color: #cce8e3; }

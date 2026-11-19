@@ -115,6 +115,15 @@ async function fill(selector: string, value: string) {
   });
 }
 
+async function choose(selector: string, value: string) {
+  const select = host.querySelector<HTMLSelectElement>(selector)!;
+  expect(select).not.toBeNull();
+  await act(() => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, value);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
 async function submit() {
   await act(async () => {
     host.querySelector("form")!.requestSubmit();
@@ -385,21 +394,22 @@ it("loads notifications and marks a selected item as read", async () => {
   fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   const defaultFetch = fetchMock.getMockImplementation()!;
-  let notificationReads = 0;
+  let markedAsRead = false;
   fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
-    if (url === "/api/notifications?unread_only=false&page=1&page_size=20") {
-      notificationReads++;
+    if (url.startsWith("/api/notifications?unread_only=false&page=1&page_size=20")) {
+      const matchesType = !url.includes("type_code=JOB_FAILED");
       return Response.json({
-        items: [{
+        items: matchesType ? [{
           notification_id: "notification-1", notification_type_code: "PROJECT_UPDATE",
           title: "Dự án được cập nhật", message: "An đã cập nhật cuộc họp tuần.",
-          created_at: "2026-11-19T10:00:00Z", read_at: notificationReads > 1 ? "2026-11-19T11:00:00Z" : null,
+          created_at: "2026-11-19T10:00:00Z", read_at: markedAsRead ? "2026-11-19T11:00:00Z" : null,
           project_id: "project-1", project_title: "Cuộc họp tuần", media_file_id: "media-1", start_ms: 65000,
-        }],
-        total: 1, unread_count: notificationReads > 1 ? 0 : 1,
+        }] : [],
+        total: matchesType ? 1 : 0, unread_count: matchesType && !markedAsRead ? 1 : 0,
+        notification_types: [{ code: "PROJECT_UPDATE", label: "Cập nhật dự án" }, { code: "JOB_FAILED", label: "Xử lý thất bại" }],
       });
     }
-    if (url === "/api/notifications/notification-1/read") return new Response(null, { status: 204 });
+    if (url === "/api/notifications/notification-1/read") { markedAsRead = true; return new Response(null, { status: 204 }); }
     return defaultFetch(url, options);
   });
   await act(async () => host.querySelector<HTMLAnchorElement>('[aria-label="Thông báo"]')!.click());
@@ -407,6 +417,12 @@ it("loads notifications and marks a selected item as read", async () => {
   expect(host.querySelector(".notification-item")?.textContent).toContain("An đã cập nhật cuộc họp tuần.");
   expect(host.querySelector('.notification-project[href="/projects/project-1?tab=content&media=media-1&t=65000"]')?.textContent).toContain("Cuộc họp tuần");
   expect(host.querySelector(".notification-count-badge")?.textContent).toBe("1");
+  await choose('[aria-label="Lọc theo loại thông báo"]', "JOB_FAILED");
+  expect(window.location.search).toContain("type=JOB_FAILED");
+  expect(host.querySelector(".empty")?.textContent).toContain("Chưa có thông báo");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/notifications?unread_only=false&page=1&page_size=20&type_code=JOB_FAILED");
+  await choose('[aria-label="Lọc theo loại thông báo"]', "PROJECT_UPDATE");
+  expect(host.querySelector(".notification-item")?.textContent).toContain("Cuộc họp tuần");
   await click("Đánh dấu đã đọc");
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
   expect(fetchMock.mock.calls.map(([url, options]) => [url, (options as RequestInit | undefined)?.method]))
