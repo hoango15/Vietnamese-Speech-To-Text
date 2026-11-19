@@ -591,6 +591,20 @@ it("rejects a whitespace-only profile name before sending an update", async () =
   expect(patches).toBe(0);
 });
 
+it("copies the signed-in email from the profile", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal("navigator", { clipboard: { writeText } });
+  await renderApp();
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) =>
+    url === "/api/users/me" ? Response.json(session.user) : defaultFetch(url, options));
+  await act(async () => host.querySelector<HTMLAnchorElement>('.sidebar-profile[href="/profile"]')!.click());
+  await click("Sao chép email");
+  expect(writeText).toHaveBeenCalledWith(session.user.email);
+  expect(host.querySelector('[role="status"]')?.textContent).toContain("Đã sao chép email.");
+});
+
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
   fetchMock.mockResolvedValueOnce(Response.json(session));

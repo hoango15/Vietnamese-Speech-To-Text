@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Mail, ShieldCheck, UserRound } from "lucide-react";
+import { Copy, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { api } from "../../shared/api/client";
 import { useAction } from "../../shared/hooks/useAction";
@@ -32,7 +32,7 @@ export function ProfilePage() {
   return <>
     <PageTitle title="Hồ sơ của tôi" subtitle="Thông tin tài khoản và vai trò trong không gian làm việc." />
     <section className="card panel account-page">
-      <div className="account-identity"><Avatar name={profile.full_name} /><div><h2>{profile.full_name}</h2><p>{profile.email}</p></div></div>
+      <div className="account-identity"><Avatar name={profile.full_name} /><div><h2>{profile.full_name}</h2><p>{profile.email}</p><button type="button" className="text-link copy-email" onClick={() => action.run(() => navigator.clipboard.writeText(profile.email), "Đã sao chép email.")}><Copy size={14} />Sao chép email</button></div></div>
       {resource.error && <ErrorBox error={resource.error} retry={resource.reload} />}
       <form className="account-form" onSubmit={saveProfile}>
         <h2>Thông tin cá nhân</h2>

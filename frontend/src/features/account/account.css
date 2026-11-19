@@ -2,6 +2,7 @@
 .account-identity { display: flex; align-items: center; gap: 15px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
 .account-identity .avatar { width: 48px; height: 48px; font-size: 16px; }
 .account-identity p { color: var(--muted); margin-top: 3px; }
+.copy-email { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 11px; cursor: pointer; }
 .account-form { display: grid; gap: 16px; max-width: 560px; }
 .password-entry { display: flex; align-items: center; gap: 4px; border: 1px solid #dfe5ec; border-radius: 8px; background: white; padding-right: 4px; }
 .password-entry:focus-within { border-color: #4db5aa; box-shadow: 0 0 0 3px #0d94880b; }
