@@ -31,16 +31,18 @@ export function NotificationsPage() {
   const requestedPage = Number(params.get("page") ?? 1);
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const unreadOnly = params.get("unread") === "true";
+  const readOnly = params.get("read") === "true";
   const typeCode = params.get("type") ?? "";
-  const path = `/notifications?unread_only=${unreadOnly}&page=${page}&page_size=20${typeCode ? `&type_code=${encodeURIComponent(typeCode)}` : ""}`;
+  const path = `/notifications?unread_only=${unreadOnly}&page=${page}&page_size=20${readOnly ? "&read_only=true" : ""}${typeCode ? `&type_code=${encodeURIComponent(typeCode)}` : ""}`;
   const resource = useResource<NotificationPage>(path), action = useAction();
   useEffect(() => {
     if (resource.data) window.dispatchEvent(new CustomEvent("notifications:unread-count", { detail: resource.data.unread_count }));
   }, [resource.data?.unread_count]);
-  const selectFilter = (unread: boolean) => {
+  const selectFilter = (status: "all" | "unread" | "read") => {
     const next = new URLSearchParams(params);
-    if (unread) next.set("unread", "true");
-    else next.delete("unread");
+    next.delete("unread"); next.delete("read");
+    if (status === "unread") next.set("unread", "true");
+    if (status === "read") next.set("read", "true");
     next.delete("page");
     setParams(next);
   };
@@ -70,8 +72,9 @@ export function NotificationsPage() {
     </PageTitle>
     <section className="card panel notifications-page">
       <div className="toolbar notification-filters" aria-label="Lọc thông báo">
-        <button className={`button ${unreadOnly ? "secondary" : ""}`} aria-pressed={!unreadOnly} onClick={() => selectFilter(false)}>Tất cả</button>
-        <button className={`button ${unreadOnly ? "" : "secondary"}`} aria-pressed={unreadOnly} onClick={() => selectFilter(true)}>Chưa đọc{resource.data ? ` (${resource.data.unread_count})` : ""}</button>
+        <button className={`button ${!unreadOnly && !readOnly ? "" : "secondary"}`} aria-pressed={!unreadOnly && !readOnly} onClick={() => selectFilter("all")}>Tất cả</button>
+        <button className={`button ${unreadOnly ? "" : "secondary"}`} aria-pressed={unreadOnly} onClick={() => selectFilter("unread")}>Chưa đọc{resource.data ? ` (${resource.data.unread_count})` : ""}</button>
+        <button className={`button ${readOnly ? "" : "secondary"}`} aria-pressed={readOnly} onClick={() => selectFilter("read")}>Đã đọc</button>
         {(notificationTypes.length > 1 || Boolean(typeCode)) && <label className="notification-type-label">Loại thông báo<select aria-label="Lọc theo loại thông báo" value={typeCode} onChange={event => selectType(event.target.value)}><option value="">Mọi loại</option>{notificationTypes.map(type => <option key={type.code} value={type.code}>{type.label}</option>)}</select></label>}
       </div>
       {resource.error ? <ErrorBox error={resource.error} retry={resource.reload} /> : resource.loading && !resource.data ? <Loading /> : resource.data?.items.length ? <>

@@ -429,6 +429,9 @@ it("loads notifications and marks a selected item as read", async () => {
     .toContainEqual(["/api/notifications/notification-1/read", "PATCH"]);
   expect(host.querySelector(".notification-item")?.classList.contains("is-read")).toBe(true);
   expect(host.querySelector(".notification-count-badge")).toBeNull();
+  await click("Đã đọc");
+  expect(window.location.search).toContain("read=true");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/notifications?unread_only=false&page=1&page_size=20&read_only=true&type_code=PROJECT_UPDATE");
 });
 
 it("restores notification filters and pagination from the URL", async () => {
