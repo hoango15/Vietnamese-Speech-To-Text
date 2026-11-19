@@ -1,12 +1,14 @@
-import type { Audit, Project } from "../../shared/types";
+import { useEffect, useState } from "react";
+import type { Audit, AuditList, Project } from "../../shared/types";
 import { ProjectCards } from "../projects/components/ProjectCards";
 import { Link } from "react-router-dom";
-import { Activity, ArrowRight, AudioLines, Check, CheckCircle2, Clock3, FolderClosed } from "lucide-react";
+import { Activity, ArrowRight, AudioLines, Check, CheckCircle2, Clock3, FolderClosed, Trash2 } from "lucide-react";
 import { canCreateProject } from "../projects/lib/permissions";
 import { useResource } from "../../shared/hooks/useResource";
 import { bytes, date, time } from "../../shared/lib/format";
-import { Empty, ErrorBox, Loading, PageTitle } from "../../shared/ui/components";
+import { Empty, ErrorBox, Loading, PageTitle, Pagination } from "../../shared/ui/components";
 import { useAuth } from "../auth/AuthProvider";
+import { useAuditDeletion } from "../activity/useAuditDeletion";
 import "./dashboard.css";
 
 export function DashboardPage() {
@@ -22,6 +24,14 @@ export function DashboardPage() {
         storage_bytes: number;
       };
     }>("/dashboard");
+  const [activityPage, setActivityPage] = useState(1);
+  const activity = useResource<AuditList>(`/audit-logs?page=${activityPage}&page_size=7`);
+  const deletion = useAuditDeletion(activity.reload);
+  useEffect(() => {
+    if (activity.loading || activity.error || !activity.data) return;
+    const lastPage = Math.max(1, Math.ceil(activity.data.total / 7));
+    if (activityPage > lastPage) setActivityPage(lastPage);
+  }, [activity.loading, activity.error, activity.data, activityPage]);
   if (loading) return <Loading />;
   if (error) return <ErrorBox error={error} retry={reload} />;
   if (!data) return null;
@@ -145,9 +155,13 @@ export function DashboardPage() {
             <h2>Hoạt động gần đây</h2>
             <Activity size={18} />
           </div>
-          {data.activities.length ? (
+          <div className="activity-actions">
+            <button className="button secondary small" disabled={deletion.busy || activity.loading || Boolean(activity.error) || !activity.data?.deletable_total}
+              onClick={() => deletion.remove()}><Trash2 size={14} />Xóa tất cả</button>
+          </div>
+          {activity.error ? <ErrorBox error={activity.error} retry={activity.reload} /> : activity.loading ? <Loading /> : activity.data?.items.length ? (
             <ol className="activity-list">
-              {data.activities.slice(0, 7).map((entry) => (
+              {activity.data.items.map((entry) => (
                 <li className="activity-item" key={entry.audit_log_id}>
                   <span className="activity-dot" />
                   <div>
@@ -157,6 +171,8 @@ export function DashboardPage() {
                     </p>
                     <small><time dateTime={entry.occurred_at}>{date(entry.occurred_at)}</time></small>
                   </div>
+                  {entry.can_delete && <button className="button secondary small" aria-label={`Xóa nhật ký ${entry.audit_log_id}`}
+                    disabled={deletion.busy} onClick={() => deletion.remove(entry.audit_log_id)}><Trash2 size={14} /></button>}
                 </li>
               ))}
             </ol>
@@ -165,6 +181,7 @@ export function DashboardPage() {
               Chưa có hoạt động được ghi nhận.
             </p>
           )}
+          {activity.data && !activity.error && <Pagination page={activityPage} total={activity.data.total} pageSize={7} onChange={setActivityPage} />}
         </section>
       </div>
     </>

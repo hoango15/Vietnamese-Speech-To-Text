@@ -44,7 +44,9 @@ export interface Audit {
   occurred_at: string;
   full_name?: string;
   change_detail?: unknown;
+  can_delete?: boolean;
 }
+export interface AuditList extends List<Audit> { deletable_total: number }
 
 export interface Company {
   company_id: string;
@@ -122,6 +124,31 @@ export interface Transcript {
   revision: number;
   segments: Segment[];
   speakers: Speaker[];
+}
+
+export interface TranscriptVersion {
+  media_file_id?: string | null;
+  transcript_id: string;
+  version_no: number;
+  created_at: string;
+  is_current: boolean;
+}
+
+export interface OCR {
+  ocr_document_id: string;
+  project_id: string;
+  revision: number;
+  text: string;
+  language_code: string;
+  created_at: string;
+}
+
+export interface OCRVersion {
+  ocr_version_id: string;
+  ocr_document_id: string;
+  revision: number;
+  text: string;
+  created_at: string;
 }
 
 export interface Minutes {

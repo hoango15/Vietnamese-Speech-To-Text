@@ -9,6 +9,10 @@ import { LoginPage } from "../features/auth/LoginPage";
 import { ProjectsPage } from "../features/projects/ProjectsPage";
 import ProjectPage from "../features/projects/ProjectPage";
 import { DashboardPage } from "../features/dashboard/DashboardPage";
+import { GlossaryPage } from "../features/glossary/GlossaryPage";
+import { SearchPage } from "../features/search/SearchPage";
+import { ProfilePage } from "../features/account/ProfilePage";
+import { SettingsPage } from "../features/account/SettingsPage";
 import { LogoutPage } from "../features/auth/LogoutPage";
 import { Loading } from "../shared/ui/components";
 import { NoticeProvider } from "../shared/ui/NoticeProvider";
@@ -50,7 +54,11 @@ export default function App() {
           { path: "projects", element: <ProjectsPage /> },
           { path: "projects/:id", element: <ProjectPage /> },
           { path: "my-projects", element: <ProjectsPage personal /> },
-          ...workspaceSections.filter((section) => !["/", "/my-projects"].includes(section.path)).map((section) => ({
+          { path: "glossaries", element: <GlossaryPage /> },
+          { path: "search", element: <SearchPage /> },
+          { path: "profile", element: <ProfilePage /> },
+          { path: "settings", element: <SettingsPage /> },
+          ...workspaceSections.filter((section) => !["/", "/my-projects", "/glossaries", "/search", "/profile", "/settings"].includes(section.path)).map((section) => ({
             path: section.path === "/projects" ? "projects/*" : section.path.slice(1),
             element: <WorkspaceSection section={section} />,
           })),

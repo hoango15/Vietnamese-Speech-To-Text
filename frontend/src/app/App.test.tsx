@@ -51,7 +51,7 @@ const recentProject = {
 
 let root: ReturnType<typeof createRoot> | undefined;
 let host: HTMLDivElement;
-let fetchMock: ReturnType<typeof vi.fn>;
+let fetchMock: ReturnType<typeof vi.fn<(url: string, options?: RequestInit) => Promise<Response>>>;
 
 beforeEach(() => {
   window.history.replaceState(null, "", "/");
@@ -62,6 +62,8 @@ beforeEach(() => {
     if (url === "/api/auth/refresh")
       return Response.json({ detail: "Phiên đã hết hạn." }, { status: 401 });
     if (url === "/api/dashboard") return Response.json(dashboard);
+    if (url === "/api/audit-logs?page=1&page_size=7")
+      return Response.json({ items: [], total: 0, deletable_total: 0 });
     if (url === "/api/projects/recent-project") return Response.json(recentProject);
     if (url === "/api/projects/recent-project/media") return Response.json({ items: [], total: 0 });
     if (url.startsWith("/api/projects?")) return Response.json({ items: [], total: 0 });
@@ -82,6 +84,18 @@ afterEach(async () => {
 async function renderApp() {
   root = createRoot(host);
   await act(async () => root!.render(<App />));
+}
+
+function mockDashboardResponse(response: Response | Promise<Response>) {
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  let pending = true;
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+    if (url === "/api/dashboard" && pending) {
+      pending = false;
+      return response;
+    }
+    return defaultFetch(url, options);
+  });
 }
 
 async function click(label: string) {
@@ -229,7 +243,7 @@ it("restores an existing session without displaying the login form", async () =>
   await renderApp();
   expect(host.textContent).toContain(session.user.email);
   expect(host.querySelector(".auth-form")).toBeNull();
-  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard", "/api/audit-logs?page=1&page_size=7"]);
 });
 
 it.each([
@@ -255,7 +269,7 @@ it("logs out only after confirmation then allows another login", async () => {
   await renderApp();
   await act(async () => host.querySelector<HTMLAnchorElement>('a[href="/logout"]')!.click());
   expect(host.textContent).toContain("Xác nhận đăng xuất");
-  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(fetchMock).toHaveBeenCalledTimes(3);
   fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
   await submit();
   expect(fetchMock.mock.calls.at(-1)?.[0]).toBe("/api/auth/logout");
@@ -264,7 +278,7 @@ it("logs out only after confirmation then allows another login", async () => {
   expect(host.querySelector("h2")?.textContent).toBe("Chào mừng trở lại");
 });
 
-it("renders the protected workspace shell and loads only the published Dashboard API", async () => {
+it("renders the protected workspace shell and loads the Dashboard and activity APIs", async () => {
   fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   expect(host.querySelector('nav[aria-label="Điều hướng chính"]')).not.toBeNull();
@@ -272,7 +286,7 @@ it("renders the protected workspace shell and loads only the published Dashboard
   expect(host.querySelector("main#main-content")).not.toBeNull();
   expect(host.querySelector("footer")).not.toBeNull();
   expect(host.querySelector('a[href="#main-content"]')).not.toBeNull();
-  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard", "/api/audit-logs?page=1&page_size=7"]);
 });
 
 it("returns to the requested protected URL after login", async () => {
@@ -299,9 +313,12 @@ it("renders the seven latest activities and labels system events", async () => {
     full_name: index === 0 ? "Trần Bình" : null,
     change_detail: null,
   }));
-  fetchMock.mockResolvedValueOnce(Response.json(session)).mockResolvedValueOnce(Response.json({
-    ...dashboard, activities,
-  }));
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) =>
+    url === "/api/audit-logs?page=1&page_size=7"
+      ? Response.json({ items: activities.slice(0, 7), total: activities.length, deletable_total: 0 })
+      : defaultFetch(url, options));
+  fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   const entries = host.querySelectorAll(".activity-list > li");
   expect(entries).toHaveLength(7);
@@ -311,7 +328,7 @@ it("renders the seven latest activities and labels system events", async () => {
   expect(entries[0].querySelector("time")?.textContent).toBe("11/11/2026");
   expect(entries[0].querySelector("time")?.getAttribute("datetime")).toBe("2026-11-11T12:00:00Z");
   expect(host.querySelector(".activity-card")?.textContent).not.toContain("Hoạt động cũ hơn");
-  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard"]);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/api/auth/refresh", "/api/dashboard", "/api/audit-logs?page=1&page_size=7"]);
 });
 
 it("shows an empty activity message when the API returns no events", async () => {
@@ -332,19 +349,36 @@ it("navigates between workspace sections and marks only the active sidebar link"
   expect(host.querySelectorAll('nav a[aria-current="page"]')).toHaveLength(1);
   expect(host.querySelector("main h1")?.textContent).toBe("Kho tệp");
   expect(host.querySelector("main")?.textContent).toContain("sẽ được bổ sung");
-  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(fetchMock).toHaveBeenCalledTimes(3);
 });
 
-it("routes header search with trimmed query text without fabricating search results", async () => {
+it("routes header search and loads transcript matches for the trimmed query", async () => {
   fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+    if (url.startsWith("/api/search/transcripts?")) return Response.json({
+      items: [{
+        project_id: "project-1", project_title: "Cuộc họp tuần", media_file_id: "media-1",
+        segment_no: 2, start_ms: 65000, end_ms: 69000, segment_text: "Tiếng Việt và phụ đề",
+        speaker_name: "Nguyễn An",
+      }],
+      total: 1,
+    });
+    return defaultFetch(url, options);
+  });
   expect(host.querySelector(".top-search")).not.toBeNull();
   await fill('.top-search input', "  tiếng Việt & phụ đề  ");
   await act(async () => host.querySelector<HTMLFormElement>(".top-search")!.requestSubmit());
   expect(window.location.pathname).toBe("/search");
   expect(new URLSearchParams(window.location.search).get("q")).toBe("tiếng Việt & phụ đề");
   expect(host.querySelector("main h1")?.textContent).toBe("Tìm kiếm nội dung");
-  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(host.querySelector(".search-result")?.textContent).toContain("Tiếng Việt và phụ đề");
+  expect(host.querySelector(".search-result")?.textContent).toContain("00:01:05");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toContain(
+    "/api/search/transcripts?q=ti%E1%BA%BFng%20Vi%E1%BB%87t%20%26%20ph%E1%BB%A5%20%C4%91%E1%BB%81&page=1&page_size=20",
+  );
+  expect(fetchMock).toHaveBeenCalledTimes(4);
 });
 
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
@@ -431,10 +465,11 @@ it("renders Dashboard statistics from the authenticated API response", async () 
 });
 
 it("shows zero statistics when the account has no projects", async () => {
-  fetchMock.mockResolvedValueOnce(Response.json(session)).mockResolvedValueOnce(Response.json({
+  mockDashboardResponse(Response.json({
     ...dashboard,
     stats: { projects: 0, ready: 0, processing: 0, duration_ms: 0, storage_bytes: 0 },
   }));
+  fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   expect(Array.from(host.querySelectorAll(".stat-value"), (item) => item.textContent))
     .toEqual(["0", "0", "0", "00:00:00"]);
@@ -443,8 +478,8 @@ it("shows zero statistics when the account has no projects", async () => {
 
 it("shows loading without invented statistics while Dashboard is pending", async () => {
   let finish!: (response: Response) => void;
-  fetchMock.mockResolvedValueOnce(Response.json(session))
-    .mockReturnValueOnce(new Promise<Response>((resolve) => { finish = resolve; }));
+  mockDashboardResponse(new Promise<Response>((resolve) => { finish = resolve; }));
+  fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   expect(host.querySelector('main [role="status"]')?.textContent).toContain("Đang tải dữ liệu");
   expect(host.querySelector(".stat-value")).toBeNull();
@@ -454,9 +489,8 @@ it("shows loading without invented statistics while Dashboard is pending", async
 });
 
 it("shows the Dashboard API error and reloads successfully on retry", async () => {
-  fetchMock.mockResolvedValueOnce(Response.json(session)).mockResolvedValueOnce(
-    Response.json({ detail: "Chưa thể tải tổng quan." }, { status: 503 }),
-  );
+  mockDashboardResponse(Response.json({ detail: "Chưa thể tải tổng quan." }, { status: 503 }));
+  fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   expect(host.querySelector('main [role="alert"]')?.textContent).toContain("Chưa thể tải tổng quan.");
   expect(host.querySelector(".stat-value")).toBeNull();
@@ -464,13 +498,13 @@ it("shows the Dashboard API error and reloads successfully on retry", async () =
   expect(host.querySelector('main [role="alert"]')).toBeNull();
   expect(host.querySelector(".stat-value")?.textContent).toBe("12");
   expect(fetchMock.mock.calls.map(([url]) => url))
-    .toEqual(["/api/auth/refresh", "/api/dashboard", "/api/dashboard"]);
+    .toEqual(["/api/auth/refresh", "/api/dashboard", "/api/audit-logs?page=1&page_size=7", "/api/dashboard"]);
 });
 
 it("cancels the pending Dashboard request when leaving the page", async () => {
   let finish!: (response: Response) => void;
-  fetchMock.mockResolvedValueOnce(Response.json(session))
-    .mockReturnValueOnce(new Promise<Response>((resolve) => { finish = resolve; }));
+  mockDashboardResponse(new Promise<Response>((resolve) => { finish = resolve; }));
+  fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   const request = fetchMock.mock.calls.find(([url]) => url === "/api/dashboard")!;
   const signal = (request[1] as RequestInit).signal!;
@@ -483,13 +517,14 @@ it("cancels the pending Dashboard request when leaving the page", async () => {
 });
 
 it("renders recent project cards with their status, progress and destination", async () => {
-  fetchMock.mockResolvedValueOnce(Response.json(session)).mockResolvedValueOnce(Response.json({
+  mockDashboardResponse(Response.json({
     ...dashboard,
     projects: [recentProject, {
       ...recentProject, project_id: "ready-project", project_title: "Phỏng vấn",
       project_description: "Nội dung đã xử lý", project_status_code: "READY", media_kind: "ORIGINAL_VIDEO",
     }],
   }));
+  fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();
   const cards = host.querySelectorAll<HTMLAnchorElement>(".project-card");
   expect(cards).toHaveLength(2);

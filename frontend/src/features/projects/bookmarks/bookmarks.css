@@ -1,0 +1,11 @@
+.bookmarks-panel { padding: 20px; }
+.bookmarks-panel > p, .bookmark-form { margin-bottom: 14px; }
+.bookmarks-panel > .button { margin-bottom: 14px; }
+.bookmark-form { display: grid; gap: 12px; }
+.bookmark-form .row-actions { flex-wrap: wrap; }
+.bookmark-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.bookmark-list > li { border-top: 1px solid var(--border); padding-top: 12px; min-width: 0; }
+.bookmark-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bookmark-heading > .text-link { border: 0; background: transparent; padding: 8px 0; font: inherit; font-variant-numeric: tabular-nums; }
+.bookmark-note { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; margin-top: 6px; }
+.bookmarks-panel .empty { padding: 20px 8px; }

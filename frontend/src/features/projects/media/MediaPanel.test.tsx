@@ -11,6 +11,30 @@ import { NoticeProvider } from "../../../shared/ui/NoticeProvider";
 let root: ReturnType<typeof createRoot>;
 afterEach(async () => { if (root) await act(() => root.unmount()); document.body.innerHTML = ""; vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+it.each(["loading", "error"])("waits for fresh metadata after the same source player is replaced by %s", async state => {
+  vi.stubGlobal("fetch", async (url: string) => Response.json(url.endsWith("/playback")
+    ? { url: "/api/media/m1/stream", expires_in: 300 } : { items: [], total: 0 }));
+  const media = [{ media_file_id: "m1", project_id: "p1", media_kind_code: "ORIGINAL_AUDIO", is_current: true,
+    mime_type: "audio/wav", file_name: "audio.wav", file_size_bytes: 1024, duration_ms: 10000, created_at: "2026-11-09" } as Media];
+  const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
+  const render = async (loading: boolean, error = "") => act(async () => root.render(<MemoryRouter><NoticeProvider><MediaPanel
+    project={{ project_id: "p1", language_code: "vi", can_edit: false, can_manage: false } as Project}
+    media={media} loading={loading} error={error} reload={() => {}} /></NoticeProvider></MemoryRouter>));
+  const mark = () => [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Đánh dấu thời điểm hiện tại"))!;
+  await render(false);
+  const first = host.querySelector("audio")!;
+  await act(() => first.dispatchEvent(new Event("loadedmetadata")));
+  expect(mark().disabled).toBe(false);
+  await render(state === "loading", state === "error" ? "Không tải được nguồn" : "");
+  expect(host.querySelector("audio")).toBeNull();
+  await render(false);
+  const replacement = host.querySelector("audio")!;
+  expect(replacement).not.toBe(first);
+  expect(mark().disabled).toBe(true);
+  await act(() => replacement.dispatchEvent(new Event("loadedmetadata")));
+  expect(mark().disabled).toBe(false);
+});
+
 it("renews playback permission without restarting the active audio source", async () => {
   vi.useFakeTimers();
   let grants = 0;

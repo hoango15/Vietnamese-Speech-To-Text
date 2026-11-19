@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useBlocker, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Clock3, Settings2, Users } from "lucide-react";
 import type { List, Media, Project } from "../../shared/types";
 import { date } from "../../shared/lib/format";
 import { Empty, ErrorBox, Loading, PageTitle, Status } from "../../shared/ui/components";
 import { useResource } from "../../shared/hooks/useResource";
+import { useUnsavedChanges } from "../../shared/hooks/useUnsavedChanges";
 import { MediaPanel } from "./media/MediaPanel";
 import { UploadPanel } from "./media/UploadPanel";
 import { JobsPanel } from "./jobs/JobsPanel";
 import { ProjectForm } from "./components/ProjectForm";
 import { ProjectOverviewPanel } from "./overview/ProjectOverviewPanel";
+import { TranscriptEditor } from "./transcript/TranscriptEditor";
+import { OCREditor } from "./ocr/OCREditor";
 import "./media/media.css";
 
 export default function ProjectPage() {
@@ -17,29 +20,41 @@ export default function ProjectPage() {
   const [params, setParams] = useSearchParams();
   const history = params.get("tab") === "jobs";
   const overview = params.get("tab") === "overview";
+  const transcriptTab = params.get("tab") === "transcript" || (params.get("tab") === "content" && params.has("t"));
+  const ocrTab = params.get("tab") === "ocr";
   const [edit, setEdit] = useState(false);
   const changeTab = (tab: string) => setParams(current => {
     const next = new URLSearchParams(current);
     next.set("tab", tab);
+    next.delete("t");
     return next;
   });
   const [sourceBusy, setSourceBusy] = useState(false);
   const [recordingDirty, setRecordingDirty] = useState(false);
-  const blocker = useBlocker(recordingDirty);
-  useEffect(() => {
-    if (blocker.state !== "blocked") return;
-    if (confirm("Bỏ bản thu và chữ chưa lưu để rời trang? Hãy tải xuống trước nếu cần giữ lại.")) blocker.proceed();
-    else blocker.reset();
-  }, [blocker]);
-  useEffect(() => {
-    if (!recordingDirty) return;
-    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [recordingDirty]);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [resultVersion, setResultVersion] = useState(0);
+  const reportDirty = useCallback((dirty: boolean) => setEditorDirty(dirty), []);
+  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
+  useUnsavedChanges(editorDirty, undefined, recordingDirty, sourceBusy);
   const project = useResource<Project>("/projects/" + id);
   const media = useResource<List<Media>>(project.data && !project.data.deleted_at ? `/projects/${id}/media` : null);
-  const processingComplete = useCallback(() => { project.reload(); media.reload(); }, [project.reload, media.reload]);
+  const processingComplete = useCallback(() => {
+    project.reload(); media.reload();
+    if (!editorDirty) setResultVersion(version => version + 1);
+  }, [project.reload, media.reload, editorDirty]);
+  const sources = media.data?.items.filter(item => item.media_kind_code.startsWith("ORIGINAL_")) ?? [];
+  const current = sources.find(item => item.media_file_id === params.get("media")) ?? sources.find(item => item.is_current) ?? sources[0];
+  useEffect(() => {
+    // Keep OCR attached to this source if processing changes the server's current file.
+    if (ocrTab && current && params.get("media") !== current.media_file_id) setParams(previous => {
+      const next = new URLSearchParams(previous);
+      next.set("media", current.media_file_id);
+      return next;
+    }, { replace: true });
+  }, [ocrTab, current?.media_file_id, params, setParams]);
+  const seek = (ms: number) => {
+    if (mediaRef.current) { mediaRef.current.currentTime = ms / 1000; mediaRef.current.focus(); }
+  };
   if (project.loading && !project.data) return <Loading />;
   if (project.error) return <ErrorBox error={project.error} retry={project.reload} />;
   const p = project.data;
@@ -48,7 +63,7 @@ export default function ProjectPage() {
     <Link className="back-link" to="/projects"><ArrowLeft size={16} />Tất cả dự án</Link>
     <PageTitle title={p.project_title} subtitle={p.deleted_at ? "Dự án đã nằm trong thùng rác." : p.project_description || "Quản lý tệp nguồn của dự án."}>
       <Status code={p.project_status_code} />
-      {p.can_manage && !p.deleted_at && <button className="button secondary" disabled={sourceBusy || recordingDirty} onClick={() => setEdit(true)}><Settings2 size={17} />Cài đặt dự án</button>}
+      {p.can_manage && !p.deleted_at && <button className="button secondary" disabled={sourceBusy || recordingDirty || editorDirty} onClick={() => setEdit(true)}><Settings2 size={17} />Cài đặt dự án</button>}
     </PageTitle>
     {p.deleted_at ? <div className="card"><Empty title="Dự án đã bị xóa" description="Khôi phục trong thùng rác để tiếp tục làm việc." /></div> : <>
       <div className="project-meta">
@@ -58,12 +73,16 @@ export default function ProjectPage() {
       </div>
       <nav className="project-tabs" aria-label="Màn hình dự án">
         <button className="button secondary" aria-pressed={overview} disabled={sourceBusy || recordingDirty} onClick={() => changeTab("overview")}>Tổng quan dự án</button>
-        <button className="button secondary" aria-pressed={!history && !overview} disabled={sourceBusy || recordingDirty} onClick={() => changeTab("content")}>Tệp nguồn</button>
+        <button className="button secondary" aria-pressed={!history && !overview && !transcriptTab && !ocrTab} disabled={sourceBusy || recordingDirty} onClick={() => changeTab("content")}>Tệp nguồn</button>
+        <button className="button secondary" aria-pressed={transcriptTab} disabled={sourceBusy || recordingDirty} onClick={() => changeTab("transcript")}>Bản ghi</button>
+        <button className="button secondary" aria-pressed={ocrTab} disabled={sourceBusy || recordingDirty} onClick={() => changeTab("ocr")}>OCR</button>
         <button className="button secondary" aria-pressed={history} disabled={sourceBusy || recordingDirty} onClick={() => changeTab("jobs")}>Lịch sử xử lý</button>
       </nav>
       {overview ? <ProjectOverviewPanel key={p.project_id} project={p} media={media.data?.items ?? []} /> : history ? <JobsPanel key={p.project_id} project={p} /> : <div className="project-media-layout">
-        <MediaPanel key={p.project_id} project={p} media={media.data?.items ?? []} loading={media.loading} error={media.error} reload={media.reload} disabled={sourceBusy || recordingDirty} onProcessed={processingComplete} />
-        {p.can_edit && <UploadPanel key={p.project_id + ":upload"} project={p} onComplete={media.reload} canChangeSource={() => true} onUploading={setSourceBusy} onRecordingDirty={setRecordingDirty} />}
+        <MediaPanel key={p.project_id} project={p} media={media.data?.items ?? []} loading={media.loading} error={media.error} reload={media.reload} disabled={sourceBusy || recordingDirty || editorDirty} onProcessed={processingComplete} mediaRef={mediaRef} />
+        {transcriptTab ? current && !current.mime_type.startsWith("image/") ? <TranscriptEditor key={`${p.project_id}:${current.media_file_id}:${resultVersion}`} project={p} mediaId={current.media_file_id} seek={seek} reportDirty={reportDirty} /> : <div className="card"><Empty title="Chọn tệp âm thanh hoặc video để xem bản ghi" /></div>
+          : ocrTab ? current?.mime_type.startsWith("image/") ? <OCREditor key={`${p.project_id}:${current.media_file_id}:${resultVersion}`} project={p} mediaId={current.media_file_id} reportDirty={reportDirty} /> : <div className="card"><Empty title="Chọn tệp ảnh để xem văn bản OCR" /></div>
+          : p.can_edit && <UploadPanel key={p.project_id + ":upload"} project={p} onComplete={media.reload} canChangeSource={() => !editorDirty} onUploading={setSourceBusy} onRecordingDirty={setRecordingDirty} />}
       </div>}
     </>}
     {edit && p.can_manage && !p.deleted_at && <ProjectForm project={p} onClose={() => setEdit(false)} onSaved={project.reload} />}

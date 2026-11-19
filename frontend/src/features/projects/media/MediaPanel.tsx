@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowDownToLine, Play, RotateCw, Trash2, UploadCloud } from "lucide-react";
 import { api } from "../../../shared/api/client";
@@ -8,8 +8,9 @@ import { bytes, date, time } from "../../../shared/lib/format";
 import { ErrorBox, Loading } from "../../../shared/ui/components";
 import { ProcessPanel } from "./ProcessPanel";
 import { useAction } from "../../../shared/hooks/useAction";
+import { BookmarksPanel } from "../bookmarks/BookmarksPanel";
 
-export function MediaPanel({ project, media, loading, error, reload, disabled = false, onProcessed }: {
+export function MediaPanel({ project, media, loading, error, reload, disabled = false, onProcessed, mediaRef }: {
   project: Project;
   media: Media[];
   loading: boolean;
@@ -17,8 +18,12 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
   reload: () => void;
   disabled?: boolean;
   onProcessed?: () => void;
+  mediaRef?: RefObject<HTMLVideoElement | HTMLAudioElement | null>;
 }) {
   const [params, setParams] = useSearchParams();
+  const ownMediaRef = useRef<HTMLVideoElement | HTMLAudioElement | null>(null);
+  const playerRef = mediaRef ?? ownMediaRef;
+  const [readyMedia, setReadyMedia] = useState<string | null>(null);
   const selected = params.get("media") ?? "";
   const [source, setSource] = useState<{ id: string; url: string } | null>(null),
     [blobLoading, setBlobLoading] = useState(false),
@@ -30,8 +35,12 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
   const current = sources.find(item => item.media_file_id === selected) ?? sources.find(item => item.is_current) ?? sources[0];
   const url = source?.id === current?.media_file_id ? source?.url : "";
   useEffect(() => {
+    if (loading || error) setReadyMedia(null);
+  }, [loading, error]);
+  useEffect(() => {
     setSource(null);
     setBlobError("");
+    setReadyMedia(null);
     setRotation(0);
     if (!current) return;
     const controller = new AbortController();
@@ -101,10 +110,18 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
                   </>
                 ) : current.mime_type.startsWith("video/") ? (
                   <video
+                    key={current.media_file_id}
+                    ref={element => { playerRef.current = element; }}
                     controls
                     src={url}
                     preload="metadata"
                     aria-label="Video nguồn"
+                    onLoadedMetadata={event => {
+                      setReadyMedia(current.media_file_id);
+                      const at = Number(params.get("t"));
+                      if (params.has("t") && Number.isFinite(at) && at >= 0) event.currentTarget.currentTime = at / 1000;
+                    }}
+                    onEmptied={() => setReadyMedia(null)}
                     onError={() => setBlobError("Không phát được video. Hãy thử lại hoặc tải tệp xuống.")}
                   />
                 ) : (
@@ -113,10 +130,18 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
                       <Play size={28} />
                     </div>
                     <audio
+                      key={current.media_file_id}
+                      ref={element => { playerRef.current = element; }}
                       controls
                       src={url}
                       preload="metadata"
                       aria-label="Âm thanh nguồn"
+                      onLoadedMetadata={event => {
+                        setReadyMedia(current.media_file_id);
+                        const at = Number(params.get("t"));
+                        if (params.has("t") && Number.isFinite(at) && at >= 0) event.currentTarget.currentTime = at / 1000;
+                      }}
+                      onEmptied={() => setReadyMedia(null)}
                       onError={() => setBlobError("Không phát được âm thanh. Hãy thử lại hoặc tải tệp xuống.")}
                     />
                   </div>
@@ -150,6 +175,10 @@ export function MediaPanel({ project, media, loading, error, reload, disabled = 
           }}><Trash2 size={16} /></button>}
       </div>
       <ProcessPanel key={current.media_file_id} project={project} media={current} disabled={disabled || action.busy} onComplete={onProcessed ?? reload} />
+      {(current.media_kind_code === "ORIGINAL_AUDIO" || current.media_kind_code === "ORIGINAL_VIDEO") && <BookmarksPanel
+        key={`bookmarks:${current.media_file_id}`} media={current} mediaRef={playerRef}
+        ready={readyMedia === current.media_file_id && Boolean(url) && !blobLoading && !blobError}
+      />}
     </>}
   </div>;
 }
