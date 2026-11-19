@@ -1,0 +1,18 @@
+.settings-tabs > button { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.settings-panel { min-width: 0; }
+.workspace-settings-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); align-items: start; gap: 24px; }
+.settings-help { background: #eff9f6; border-color: #d9ece6; display: grid; gap: 17px; }
+.settings-help > svg { color: var(--teal); }
+.settings-help p { color: #466f60; font-size: 12px; }
+.settings-panel .section-heading p { margin-top: 6px; font-size: 12px; }
+.settings-permissions { display: grid; gap: 18px; margin: 22px 0; }
+.settings-permissions > div { padding: 18px; background: #f8fafb; border: 1px solid var(--border); border-radius: 9px; }
+.settings-permissions p { margin-top: 10px; color: var(--muted); font-size: 12px; }
+.processing-capabilities { display: grid; gap: 0; }
+.capability-row { display: flex; gap: 15px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.capability-row > div:nth-child(2) { flex: 1; min-width: 0; }
+.capability-row p { font-size: 11px; margin-top: 5px; }
+.capability-ready { background: #e7f7ef; color: #27815d; }
+.processing-privacy { margin: 24px 0; }
+@media (max-width: 1000px) { .workspace-settings-grid { grid-template-columns: 1fr; } }
+@media (max-width: 650px) { .capability-row { flex-wrap: wrap; } .capability-row > .badge { margin-left: 55px; } }
