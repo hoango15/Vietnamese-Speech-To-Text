@@ -1,0 +1,78 @@
+// @vitest-environment happy-dom
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { afterEach, expect, it, vi } from "vitest";
+import { api } from "../../../shared/api/client";
+import type { Project } from "../../../shared/types";
+import { NoticeProvider } from "../../../shared/ui/NoticeProvider";
+import { OCREditor } from "./OCREditor";
+
+(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+const documentData = { ocr_document_id: "o1", project_id: "p1", revision: 2, text: "Nội dung nhận dạng", language_code: "vi", created_at: "2026-11-05T00:00:00Z" };
+let root: ReturnType<typeof createRoot> | undefined;
+let host: HTMLDivElement;
+const dirty = vi.fn();
+async function mount(handler: (url: string, options: RequestInit) => Response | Promise<Response> = url => Response.json(url.includes("/versions") ? { items: [], total: 0 } : documentData), canEdit = false) {
+  vi.stubGlobal("fetch", (url: string, options: RequestInit = {}) => Promise.resolve(handler(url, options)));
+  host = document.createElement("div"); document.body.append(host);
+  root = createRoot(host);
+  await act(() => root!.render(<NoticeProvider><OCREditor project={{ project_id: "p1", can_edit: canEdit } as Project} mediaId="image 2" reportDirty={dirty} /></NoticeProvider>));
+}
+function button(label: string) {
+  return [...document.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent?.trim() === label || item.getAttribute("aria-label") === label)!;
+}
+afterEach(async () => {
+  if (root) await act(() => root!.unmount());
+  root = undefined; api.setSession(null); vi.unstubAllGlobals(); vi.restoreAllMocks(); dirty.mockClear(); document.body.innerHTML = "";
+});
+
+it("reads OCR and history for the selected media without exposing viewer edits", async () => {
+  const requests: string[] = [];
+  await mount(url => { requests.push(url); return Response.json(url.includes("/versions") ? { items: [], total: 0 } : documentData); });
+  expect(host.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("Nội dung nhận dạng");
+  expect(host.querySelector<HTMLTextAreaElement>("textarea")?.readOnly).toBe(true);
+  expect(button("Lưu")).toBeUndefined();
+  expect(requests).toContain("/api/projects/p1/ocr?media_file_id=image%202");
+  await act(() => button("Lịch sử OCR").click());
+  expect(requests).toContain("/api/projects/p1/ocr/versions?media_file_id=image%202");
+  expect(host.textContent).toContain("Chưa có lịch sử");
+});
+
+it("shows every history snapshot even when the first item has an older revision", async () => {
+  await mount(url => Response.json(url.includes("/versions") ? { items: [
+    { ocr_version_id: "v1", ocr_document_id: "o1", revision: 1, text: "Bản cũ", created_at: "2026-11-06T00:00:00Z" },
+    { ocr_version_id: "o1:current", ocr_document_id: "o1", revision: 2, text: "Nội dung nhận dạng", created_at: "2026-11-05T00:00:00Z" },
+  ], total: 2 } : documentData));
+  await act(() => button("Lịch sử OCR").click());
+  const snapshots = [...host.querySelectorAll("details")];
+  expect(snapshots).toHaveLength(2);
+  expect(snapshots[0].textContent).toContain("Bản cũ");
+  expect(snapshots[1].textContent).toContain("Nội dung nhận dạng");
+  expect(host.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("Nội dung nhận dạng");
+});
+
+it("treats missing OCR as empty instead of a load error", async () => {
+  await mount(url => url.includes("/versions") ? Response.json({ items: [], total: 0 }) : Response.json({ detail: "Chưa có OCR" }, { status: 404 }));
+  expect(host.textContent).toContain("Chưa có văn bản OCR");
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
+it("retries a failed OCR load", async () => {
+  let failed = true;
+  await mount(url => Response.json(url.includes("/versions") ? { items: [], total: 0 } : failed ? { detail: "Máy chủ tạm lỗi" } : documentData, { status: !url.includes("/versions") && failed ? 503 : 200 }));
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain("Máy chủ tạm lỗi");
+  failed = false;
+  await act(() => button("Thử lại").click());
+  expect(host.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("Nội dung nhận dạng");
+});
+
+it("retries history errors without replacing the displayed document", async () => {
+  let failed = true;
+  await mount(url => !url.includes("/versions") ? Response.json(documentData) : failed ? Response.json({ detail: "Lỗi lịch sử" }, { status: 503 }) : Response.json({ items: [{ ocr_version_id: "v1", ocr_document_id: "o1", revision: 1, text: "Bản cũ", created_at: documentData.created_at }], total: 1 }));
+  await act(() => button("Lịch sử OCR").click());
+  expect(document.querySelector("dialog")?.textContent).toContain("Lỗi lịch sử");
+  failed = false;
+  await act(() => button("Thử lại").click());
+  expect(host.querySelector("details")?.textContent).toContain("Bản cũ");
+  expect(host.querySelector<HTMLTextAreaElement>("textarea")?.value).toBe("Nội dung nhận dạng");
+});

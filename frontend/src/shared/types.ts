@@ -134,6 +134,23 @@ export interface TranscriptVersion {
   is_current: boolean;
 }
 
+export interface OCR {
+  ocr_document_id: string;
+  project_id: string;
+  revision: number;
+  text: string;
+  language_code: string;
+  created_at: string;
+}
+
+export interface OCRVersion {
+  ocr_version_id: string;
+  ocr_document_id: string;
+  revision: number;
+  text: string;
+  created_at: string;
+}
+
 export interface Minutes {
   media_file_id?: string | null;
   minutes_id: string;
