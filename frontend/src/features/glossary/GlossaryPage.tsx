@@ -6,7 +6,7 @@ import { Empty, ErrorBox, Loading, PageTitle, Pagination } from "../../shared/ui
 import { useResource } from "../../shared/hooks/useResource";
 import { useAction } from "../../shared/hooks/useAction";
 import { message } from "../../shared/lib/errors";
-import { glossaryToCsv, type GlossaryCsvEntry } from "./csv";
+import { downloadGlossaryCsv, glossaryToCsv, type GlossaryCsvEntry } from "./csv";
 import { parseGlossaryCsv } from "./csv-import";
 import "./glossary.css";
 
@@ -22,14 +22,7 @@ export function GlossaryPage() {
     ? a.term.localeCompare(b.term, "vi", { sensitivity: "base" })
     : b.updated_at.localeCompare(a.updated_at));
   const exportCsv = () => {
-    const url = URL.createObjectURL(new Blob([glossaryToCsv(terms)], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "tu-dien-thuat-ngu.csv";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadGlossaryCsv(glossaryToCsv(terms), "tu-dien-thuat-ngu.csv");
   };
   const chooseImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
@@ -83,6 +76,7 @@ export function GlossaryPage() {
       <label className="glossary-language-filter">Lọc ngôn ngữ<select aria-label="Lọc thuật ngữ theo ngôn ngữ" value={language} onChange={event => { setLanguage(event.target.value); setPage(1); }}><option value="">Tất cả ngôn ngữ</option><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
       <label className="glossary-sort-filter">Sắp xếp trong trang<select aria-label="Sắp xếp thuật ngữ" value={sort} onChange={event => setSort(event.target.value as "updated" | "term")}><option value="updated">Mới cập nhật</option><option value="term">Tên A–Z</option></select></label>
       <details className="glossary-import" open={Boolean(importRows.length || importError)}><summary>Nhập từ CSV</summary>
+        <button type="button" className="button secondary small" onClick={() => downloadGlossaryCsv(glossaryToCsv([]), "mau-tu-dien-thuat-ngu.csv")}>Tải mẫu CSV</button>
         <label>Chọn tệp CSV<input type="file" accept=".csv,text/csv" onChange={chooseImportFile} /></label>
         {importName && <p className="muted small-text">{importName}</p>}
         {importError && <p className="glossary-import-error" role="alert">{importError}</p>}

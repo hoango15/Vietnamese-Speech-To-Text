@@ -11,3 +11,7 @@ it("escapes commas, quotes and newlines in every CSV field", () => {
   expect(glossaryToCsv([{ term: 'Từ, "đặc biệt"', definition: "Dòng một\nDòng hai", language_code: "en", category: "Kỹ thuật, nội bộ" }]))
     .toBe('\uFEFF"Thuật ngữ","Giải thích","Ngôn ngữ","Nhóm"\r\n"Từ, ""đặc biệt""","Dòng một\nDòng hai","en","Kỹ thuật, nội bộ"');
 });
+
+it("creates a valid header-only CSV template for importing terms", () => {
+  expect(glossaryToCsv([])).toBe('\uFEFF"Thuật ngữ","Giải thích","Ngôn ngữ","Nhóm"');
+});
