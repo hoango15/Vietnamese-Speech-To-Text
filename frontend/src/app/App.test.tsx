@@ -386,6 +386,7 @@ it("routes header search and loads transcript matches for the trimmed query", as
   expect(window.location.pathname).toBe("/search");
   expect(new URLSearchParams(window.location.search).get("q")).toBe("tiếng Việt & phụ đề");
   expect(host.querySelector("main h1")?.textContent).toBe("Tìm kiếm nội dung");
+  expect(host.querySelector('.search-count[role="status"][aria-live="polite"]')?.textContent).toContain("Tìm thấy 1 kết quả");
   expect(host.querySelector(".search-result")?.textContent).toContain("Tiếng Việt và phụ đề");
   expect(host.querySelector(".search-result")?.textContent).toContain("00:01:05");
   expect(fetchMock.mock.calls.map(([url]) => url)).toContain(
