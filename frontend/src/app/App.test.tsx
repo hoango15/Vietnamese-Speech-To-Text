@@ -573,6 +573,24 @@ it("reveals and hides each password field independently in account settings", as
   expect(host.querySelector<HTMLButtonElement>(".settings-page .form-actions button")?.disabled).toBe(true);
 });
 
+it("rejects a whitespace-only profile name before sending an update", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  let patches = 0;
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+    if (url === "/api/users/me" && options?.method === "PATCH") { patches++; return Response.json(session.user); }
+    if (url === "/api/users/me") return Response.json(session.user);
+    return defaultFetch(url, options);
+  });
+  await act(async () => host.querySelector<HTMLAnchorElement>('.sidebar-profile[href="/profile"]')!.click());
+  await fill("form.account-form input", "   ");
+  await act(async () => host.querySelector<HTMLFormElement>("form.account-form")!.requestSubmit());
+  expect(host.querySelector('[role="alert"]')?.textContent).toBe("Họ và tên không được để trống.");
+  expect(host.querySelector('form.account-form input')?.getAttribute("aria-invalid")).toBe("true");
+  expect(patches).toBe(0);
+});
+
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
   fetchMock.mockResolvedValueOnce(Response.json(session));
