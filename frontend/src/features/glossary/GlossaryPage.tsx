@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { BookOpen, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { BookOpen, Download, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api } from "../../shared/api/client";
 import type { List } from "../../shared/types";
 import { Empty, ErrorBox, Loading, PageTitle, Pagination } from "../../shared/ui/components";
 import { useResource } from "../../shared/hooks/useResource";
 import { useAction } from "../../shared/hooks/useAction";
+import { glossaryToCsv } from "./csv";
 import "./glossary.css";
 
 interface GlossaryTerm { term_id: string; term: string; definition: string; language_code: string; category?: string | null; updated_at: string }
@@ -17,6 +18,16 @@ export function GlossaryPage() {
   const terms = [...(resource.data?.items ?? [])].sort((a, b) => sort === "term"
     ? a.term.localeCompare(b.term, "vi", { sensitivity: "base" })
     : b.updated_at.localeCompare(a.updated_at));
+  const exportCsv = () => {
+    const url = URL.createObjectURL(new Blob([glossaryToCsv(terms)], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "tu-dien-thuat-ngu.csv";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -29,6 +40,7 @@ export function GlossaryPage() {
   };
   return <>
     <PageTitle title="Từ điển thuật ngữ" subtitle="Lưu cách viết và giải thích thống nhất cho các thuật ngữ chuyên ngành.">
+      <button className="button secondary" disabled={!terms.length} onClick={exportCsv}><Download size={16} />Xuất CSV trang này</button>
       <button className="button" onClick={() => { setEditing(null); setDraft("new"); }}><Plus size={17} />Thêm thuật ngữ</button>
     </PageTitle>
     <section className="card panel glossary-page">
