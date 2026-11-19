@@ -15,4 +15,11 @@
 .glossary-term-title h2 { color: var(--heading); }
 .glossary-term-title span, .glossary-term-title small { color: var(--muted); font-size: 10px; background: #f2f6f7; padding: 3px 7px; border-radius: 99px; }
 .glossary-term p { margin-top: 9px; color: #566174; white-space: pre-wrap; }
+.glossary-import { border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: grid; gap: 12px; }
+.glossary-import summary { cursor: pointer; color: var(--heading); font-weight: 650; }
+.glossary-import input[type="file"] { padding: 7px; }
+.glossary-import-error { color: #a63d3d; font-size: 12px; }
+.glossary-import-preview { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.glossary-import-preview li { padding-left: 2px; }
+.glossary-import-preview span { display: block; color: var(--muted); margin-top: 3px; }
 @media(max-width:700px) { .glossary-fields { grid-template-columns: 1fr; } .glossary-wide { grid-column: auto; } .glossary-search { flex-wrap: wrap; } .glossary-search input { min-width: calc(100% - 36px); } }

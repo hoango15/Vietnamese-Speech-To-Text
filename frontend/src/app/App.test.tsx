@@ -473,6 +473,34 @@ it("filters glossary terms by language without changing their content", async ()
   expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/glossaries?q=&page=1&page_size=20&language_code=en");
 });
 
+it("previews CSV glossary imports before creating each term", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  const creates: unknown[] = [];
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+    if (url.startsWith("/api/glossaries?")) return Response.json({ items: [], total: 0 });
+    if (url === "/api/glossaries" && options?.method === "POST") {
+      creates.push(JSON.parse(options.body as string));
+      return Response.json({ term_id: `term-${creates.length}` }, { status: 201 });
+    }
+    return defaultFetch(url, options);
+  });
+  await act(async () => host.querySelector<HTMLAnchorElement>('nav a[href="/glossaries"]')!.click());
+  const input = host.querySelector<HTMLInputElement>('.glossary-import input[type="file"]')!;
+  const file = new File(["term,definition,language,category\nmeeting,cuộc họp,en,General\nagenda,chương trình,en,General"], "terms.csv", { type: "text/csv" });
+  Object.defineProperty(input, "files", { configurable: true, value: [file] });
+  await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  expect(host.querySelector(".glossary-import-preview")?.textContent).toContain("meeting");
+  expect(host.textContent).toContain("Đã đọc 2 thuật ngữ");
+  await click("Nhập 2 thuật ngữ");
+  expect(creates).toEqual([
+    { term: "meeting", definition: "cuộc họp", language_code: "en", category: "General" },
+    { term: "agenda", definition: "chương trình", language_code: "en", category: "General" },
+  ]);
+  expect(host.textContent).not.toContain("Đã đọc 2 thuật ngữ");
+});
+
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
   fetchMock.mockResolvedValueOnce(Response.json(session));

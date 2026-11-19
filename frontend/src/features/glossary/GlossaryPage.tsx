@@ -5,7 +5,9 @@ import type { List } from "../../shared/types";
 import { Empty, ErrorBox, Loading, PageTitle, Pagination } from "../../shared/ui/components";
 import { useResource } from "../../shared/hooks/useResource";
 import { useAction } from "../../shared/hooks/useAction";
-import { glossaryToCsv } from "./csv";
+import { message } from "../../shared/lib/errors";
+import { glossaryToCsv, type GlossaryCsvEntry } from "./csv";
+import { parseGlossaryCsv } from "./csv-import";
 import "./glossary.css";
 
 interface GlossaryTerm { term_id: string; term: string; definition: string; language_code: string; category?: string | null; updated_at: string }
@@ -13,6 +15,7 @@ interface GlossaryTerm { term_id: string; term: string; definition: string; lang
 export function GlossaryPage() {
   const [q, setQ] = useState(""), [draft, setDraft] = useState(""), [page, setPage] = useState(1), [language, setLanguage] = useState(""), [sort, setSort] = useState<"updated" | "term">("updated");
   const [editing, setEditing] = useState<GlossaryTerm | null>(null);
+  const [importRows, setImportRows] = useState<GlossaryCsvEntry[]>([]), [importName, setImportName] = useState(""), [importError, setImportError] = useState("");
   const path = `/glossaries?q=${encodeURIComponent(q)}&page=${page}&page_size=20${language ? `&language_code=${encodeURIComponent(language)}` : ""}`;
   const resource = useResource<List<GlossaryTerm>>(path), action = useAction();
   const terms = [...(resource.data?.items ?? [])].sort((a, b) => sort === "term"
@@ -28,6 +31,34 @@ export function GlossaryPage() {
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+  const chooseImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    setImportName(file.name);
+    setImportError("");
+    setImportRows([]);
+    try {
+      if (file.size > 1024 * 1024) throw new Error("Tệp CSV không được lớn hơn 1 MB.");
+      const rows = parseGlossaryCsv(await file.text());
+      if (!rows.length) throw new Error("Tệp chưa có thuật ngữ để nhập.");
+      setImportRows(rows);
+    } catch (error) {
+      setImportError(message(error));
+    }
+  };
+  const importTerms = () => action.run(async () => {
+    let imported = 0;
+    for (const row of importRows) {
+      try {
+        await api.request("/glossaries", { method: "POST", body: row });
+        imported++;
+      } catch (error) {
+        resource.reload();
+        throw new Error(`Đã nhập ${imported}/${importRows.length} thuật ngữ trước khi gặp lỗi: ${message(error)}`);
+      }
+    }
+    setImportRows([]); setImportName(""); setImportError(""); resource.reload();
+  }, `Đã nhập ${importRows.length} thuật ngữ.`);
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -51,6 +82,12 @@ export function GlossaryPage() {
       </form>
       <label className="glossary-language-filter">Lọc ngôn ngữ<select aria-label="Lọc thuật ngữ theo ngôn ngữ" value={language} onChange={event => { setLanguage(event.target.value); setPage(1); }}><option value="">Tất cả ngôn ngữ</option><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
       <label className="glossary-sort-filter">Sắp xếp trong trang<select aria-label="Sắp xếp thuật ngữ" value={sort} onChange={event => setSort(event.target.value as "updated" | "term")}><option value="updated">Mới cập nhật</option><option value="term">Tên A–Z</option></select></label>
+      <details className="glossary-import" open={Boolean(importRows.length || importError)}><summary>Nhập từ CSV</summary>
+        <label>Chọn tệp CSV<input type="file" accept=".csv,text/csv" onChange={chooseImportFile} /></label>
+        {importName && <p className="muted small-text">{importName}</p>}
+        {importError && <p className="glossary-import-error" role="alert">{importError}</p>}
+        {importRows.length > 0 && <><p className="muted small-text">Đã đọc {importRows.length} thuật ngữ. Xem trước tối đa 5 dòng:</p><ul className="glossary-import-preview">{importRows.slice(0, 5).map((row, index) => <li key={`${row.term}-${index}`}><strong>{row.term}</strong><span>{row.definition}</span></li>)}</ul><button className="button small" disabled={action.busy} onClick={importTerms}>Nhập {importRows.length} thuật ngữ</button></>}
+      </details>
       {editing || draft === "new" ? <form className="glossary-form" onSubmit={save}>
         <h2>{editing ? "Sửa thuật ngữ" : "Thêm thuật ngữ"}</h2>
         <div className="glossary-fields"><label>Thuật ngữ<input name="term" required maxLength={160} defaultValue={editing?.term ?? ""} /></label>
