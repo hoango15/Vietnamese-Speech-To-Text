@@ -394,7 +394,7 @@ it("loads notifications and marks a selected item as read", async () => {
           notification_id: "notification-1", notification_type_code: "PROJECT_UPDATE",
           title: "Dự án được cập nhật", message: "An đã cập nhật cuộc họp tuần.",
           created_at: "2026-11-19T10:00:00Z", read_at: notificationReads > 1 ? "2026-11-19T11:00:00Z" : null,
-          project_id: "project-1", project_title: "Cuộc họp tuần",
+          project_id: "project-1", project_title: "Cuộc họp tuần", media_file_id: "media-1", start_ms: 65000,
         }],
         total: 1, unread_count: notificationReads > 1 ? 0 : 1,
       });
@@ -405,7 +405,7 @@ it("loads notifications and marks a selected item as read", async () => {
   await act(async () => host.querySelector<HTMLAnchorElement>('[aria-label="Thông báo"]')!.click());
   expect(host.querySelector("main h1")?.textContent).toBe("Thông báo");
   expect(host.querySelector(".notification-item")?.textContent).toContain("An đã cập nhật cuộc họp tuần.");
-  expect(host.querySelector('.notification-project[href="/projects/project-1"]')?.textContent).toContain("Cuộc họp tuần");
+  expect(host.querySelector('.notification-project[href="/projects/project-1?tab=content&media=media-1&t=65000"]')?.textContent).toContain("Cuộc họp tuần");
   await click("Đánh dấu đã đọc");
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
   expect(fetchMock.mock.calls.map(([url, options]) => [url, (options as RequestInit | undefined)?.method]))

@@ -18,6 +18,8 @@ interface AppNotification {
   read_at: string | null;
   project_id?: string | null;
   project_title?: string | null;
+  media_file_id?: string | null;
+  start_ms?: number | null;
 }
 type NotificationPage = List<AppNotification> & { unread_count: number };
 
@@ -53,7 +55,9 @@ export function NotificationsPage() {
         <div className="notification-list">{resource.data.items.map(item => <article className={`notification-item ${item.read_at ? "is-read" : "is-unread"}`} key={item.notification_id}>
           <span className="notification-icon"><Bell size={18} /></span>
           <div className="notification-copy"><div className="notification-title"><h2>{item.title}</h2>{!item.read_at && <span className="unread-pill">Mới</span>}</div><p>{item.message}</p><time dateTime={item.created_at}>{date(item.created_at)}</time>
-            {item.project_id && <Link className="text-link notification-project" to={`/projects/${encodeURIComponent(item.project_id)}`}>{item.project_title || "Mở dự án"}<ExternalLink size={14} /></Link>}
+            {item.project_id && <Link className="text-link notification-project" to={item.media_file_id
+              ? `/projects/${encodeURIComponent(item.project_id)}?tab=content&media=${encodeURIComponent(item.media_file_id)}${typeof item.start_ms === "number" && Number.isFinite(item.start_ms) && item.start_ms >= 0 ? `&t=${item.start_ms}` : ""}`
+              : `/projects/${encodeURIComponent(item.project_id)}`}>{item.project_title || "Mở dự án"}<ExternalLink size={14} /></Link>}
           </div>
           {!item.read_at && <button className="button secondary small notification-read" disabled={action.busy} onClick={() => action.run(async () => {
             await api.request(`/notifications/${encodeURIComponent(item.notification_id)}/read`, { method: "PATCH" });
