@@ -39,6 +39,7 @@ export function parseGlossaryCsv(input: string): GlossaryCsvEntry[] {
   if (termColumn < 0 || definitionColumn < 0)
     throw new Error("CSV cần có cột “Thuật ngữ” và “Giải thích”.");
   if (rows.length > 500) throw new Error("Mỗi lần chỉ có thể nhập tối đa 500 thuật ngữ.");
+  const seen = new Set<string>();
   return rows.map((row, index) => {
     const term = row[termColumn]?.trim() ?? "", definition = row[definitionColumn]?.trim() ?? "";
     const language_code = (languageColumn >= 0 ? row[languageColumn]?.trim() : "") || "vi";
@@ -47,6 +48,9 @@ export function parseGlossaryCsv(input: string): GlossaryCsvEntry[] {
       throw new Error(`Dòng ${index + 2}: thuật ngữ tối đa 160 ký tự, giải thích tối đa 4.000 ký tự.`);
     if (!/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i.test(language_code))
       throw new Error(`Dòng ${index + 2}: mã ngôn ngữ không hợp lệ.`);
+    const duplicateKey = `${language_code.toLocaleLowerCase()}\u0000${term.normalize("NFKC").trim().toLocaleLowerCase()}`;
+    if (seen.has(duplicateKey)) throw new Error(`Dòng ${index + 2}: thuật ngữ bị lặp trong tệp CSV.`);
+    seen.add(duplicateKey);
     return {
       term,
       definition,

@@ -25,4 +25,9 @@ describe("parseGlossaryCsv", () => {
   it("reports invalid rows instead of silently skipping partial terms", () => {
     expect(() => parseGlossaryCsv("term,definition\nTừ,")).toThrow("Dòng 2");
   });
+
+  it("rejects duplicate terms in the same language before starting an import", () => {
+    expect(() => parseGlossaryCsv("term,definition,language\nMeeting,Cuộc họp,en\nmeeting,Trao đổi,en"))
+      .toThrow("Dòng 3: thuật ngữ bị lặp");
+  });
 });
