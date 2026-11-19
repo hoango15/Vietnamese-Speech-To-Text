@@ -30,6 +30,7 @@ async function mount(handler: (url: string, options: RequestInit) => Response | 
 afterEach(async () => {
   if (root) await act(() => root!.unmount());
   root = undefined; api.setSession(null); vi.unstubAllGlobals(); document.body.innerHTML = ""; localStorage.clear();
+  vi.useRealTimers();
 });
 
 it("opens project files from the protected detail route with size and duration", async () => {
@@ -365,4 +366,110 @@ it("does not offer timestamped bookmarks for image sources", async () => {
   });
   expect(host.querySelector(".bookmarks-panel")).toBeNull();
   expect(requests.some(url => url.includes("/bookmarks"))).toBe(false);
+});
+
+const image = { ...media, media_file_id: "i1", mime_type: "image/png", media_kind_code: "ORIGINAL_IMAGE", file_name: "image.png", duration_ms: 0 };
+const ocr = { ocr_document_id: "o1", project_id: "p1", revision: 1, text: "Ảnh thứ nhất", language_code: "vi", created_at: project.created_at };
+function projectTab(label: string) {
+  return [...host.querySelectorAll<HTMLButtonElement>(".project-tabs button")].find(button => button.textContent === label)!;
+}
+
+it("opens OCR for the selected image and reloads it when choosing another source", async () => {
+  const requests: string[] = [];
+  await mount(url => {
+    requests.push(url);
+    if (url === "/api/projects/p1/media") return Response.json({ items: [image, { ...image, media_file_id: "i2", is_current: false }, media], total: 3 });
+    if (url.endsWith("/download")) return new Response(new Blob(["image"], { type: "image/png" }));
+    if (url.includes("/ocr?") && !url.includes("/versions")) return Response.json({ ...ocr, text: url.includes("i2") ? "Ảnh thứ hai" : "Ảnh thứ nhất" });
+    return Response.json({ items: [], total: 0 });
+  }, { can_edit: false, can_manage: false }, "/projects/p1?tab=ocr&media=i2");
+  expect(projectTab("OCR")).toBeDefined();
+  expect(projectTab("OCR").getAttribute("aria-pressed")).toBe("true");
+  expect(projectTab("Tệp nguồn").getAttribute("aria-pressed")).toBe("false");
+  expect(host.querySelector<HTMLTextAreaElement>(".ocr-text")?.value).toBe("Ảnh thứ hai");
+  expect(host.querySelector<HTMLTextAreaElement>(".ocr-text")?.readOnly).toBe(true);
+  expect(requests).toContain("/api/projects/p1/ocr?media_file_id=i2");
+  expect(requests).toContain("/api/projects/p1/ocr/versions?media_file_id=i2");
+  const select = host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')!;
+  await act(() => { select.value = "i1"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(host.querySelector<HTMLTextAreaElement>(".ocr-text")?.value).toBe("Ảnh thứ nhất");
+  expect(window.location.search).toContain("tab=ocr");
+  expect(host.querySelector('input[type="file"]')).toBeNull();
+});
+
+it("does not request OCR for an audio source or show the upload panel in the OCR tab", async () => {
+  const requests: string[] = [];
+  await mount(url => { requests.push(url); return Response.json({ items: url.endsWith("/media") ? [media] : [], total: 1 }); }, {}, "/projects/p1?tab=ocr&media=m1");
+  expect(host.textContent).toContain("Chọn tệp ảnh để xem văn bản OCR");
+  expect(requests.some(url => url.includes("/ocr"))).toBe(false);
+  expect(host.querySelector('input[type="file"]')).toBeNull();
+});
+
+it("waits for the source list before requesting OCR", async () => {
+  const requests: string[] = [];
+  let resolve!: (response: Response) => void;
+  await mount(url => {
+    requests.push(url);
+    if (url.endsWith("/media")) return new Promise<Response>(done => { resolve = done; });
+    if (url.endsWith("/download")) return new Response(new Blob(["image"], { type: "image/png" }));
+    if (url.includes("/ocr?")) return Response.json(ocr);
+    return Response.json({ items: [], total: 0 });
+  }, {}, "/projects/p1?tab=ocr");
+  expect(requests.some(url => url.includes("/ocr"))).toBe(false);
+  await act(() => resolve(Response.json({ items: [image], total: 1 })));
+  expect(host.querySelector<HTMLTextAreaElement>(".ocr-text")?.value).toBe("Ảnh thứ nhất");
+  expect(requests).toContain("/api/projects/p1/ocr?media_file_id=i1");
+  expect(window.location.search).toContain("media=i1");
+});
+
+it("keeps an unsaved OCR draft after one cancelled navigation and allows confirmed discard", async () => {
+  await mount(url => url.endsWith("/media") ? Response.json({ items: [image], total: 1 }) : url.endsWith("/download") ? new Response(new Blob(["image"], { type: "image/png" })) : url.includes("/ocr?") ? Response.json(ocr) : Response.json({ items: [], total: 0 }), {}, "/projects/p1?tab=ocr&media=i1");
+  const textarea = host.querySelector<HTMLTextAreaElement>(".ocr-text");
+  expect(textarea).not.toBeNull();
+  await act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "Bản nháp OCR");
+    textarea!.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')?.disabled).toBe(true);
+  expect(host.querySelector<HTMLButtonElement>('[aria-label="Xóa tệp nguồn"]')?.disabled).toBe(true);
+  const confirm = vi.fn(() => false); vi.stubGlobal("confirm", confirm);
+  await act(() => projectTab("Tệp nguồn").click());
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(host.querySelector<HTMLTextAreaElement>(".ocr-text")?.value).toBe("Bản nháp OCR");
+  expect(window.location.search).toContain("tab=ocr");
+  confirm.mockReturnValue(true);
+  await act(() => projectTab("Tệp nguồn").click());
+  expect(window.location.search).toContain("tab=content");
+  expect(host.querySelector('input[type="file"]')).not.toBeNull();
+  expect(host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')?.disabled).toBe(false);
+});
+
+it.each([
+  { dirty: false, initialMedia: "" },
+  { dirty: true, initialMedia: "" },
+  { dirty: true, initialMedia: "&media=removed-source" },
+])("refreshes clean OCR after processing and preserves drafts: %j", async ({ dirty, initialMedia }) => {
+  vi.useFakeTimers();
+  let completed = false;
+  let ocrReads = 0;
+  const job = { job_id: "j1", project_id: "p1", media_file_id: "i1", job_status_code: "RUNNING", progress_percent: 50, error_message: null, created_at: project.created_at, started_at: project.created_at };
+  await mount(url => {
+    if (url.endsWith("/media")) return Response.json({ items: [{ ...image, is_current: !completed }, { ...image, media_file_id: "i2", is_current: completed }], total: 2 });
+    if (url.endsWith("/download")) return new Response(new Blob(["image"], { type: "image/png" }));
+    if (url === "/api/jobs/j1") { completed = true; return Response.json({ ...job, job_status_code: "SUCCEEDED", progress_percent: 100, finished_at: "2026-11-12T00:01:00Z" }); }
+    if (url.includes("/jobs?status=RUNNING") && !completed) return Response.json({ items: [job], total: 1 });
+    if (url.includes("/ocr?")) { ocrReads++; return Response.json({ ...ocr, text: completed ? "OCR mới" : ocr.text }); }
+    return Response.json({ items: [], total: 0 });
+  }, {}, "/projects/p1?tab=ocr" + initialMedia);
+  const textarea = host.querySelector<HTMLTextAreaElement>(".ocr-text");
+  expect(textarea).not.toBeNull();
+  if (dirty) await act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "Bản nháp OCR");
+    textarea!.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+  expect(completed).toBe(true);
+  expect(host.querySelector<HTMLTextAreaElement>(".ocr-text")?.value).toBe(dirty ? "Bản nháp OCR" : "OCR mới");
+  expect(host.querySelector<HTMLSelectElement>('[aria-label="Chọn tệp xem trước"]')?.value).toBe("i1");
+  expect(ocrReads).toBe(dirty ? 1 : 2);
 });

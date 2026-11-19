@@ -32,6 +32,7 @@ npm run build
 - `src/features/projects/jobs/`: tiến độ, thời gian, các giai đoạn, hủy/thử lại, lịch sử và kết quả riêng của từng tác vụ.
 - `src/features/projects/exports/`: xuất tệp và phụ đề video.
 - `src/features/projects/bookmarks/`: dấu mốc và ghi chú cá nhân theo từng tệp âm thanh/video; tạo, sửa, xóa và tua đến thời điểm đã lưu.
+- `src/features/projects/ocr/`: xem, chỉnh sửa và lịch sử OCR theo từng tệp ảnh; lưu theo revision và bảo vệ bản nháp.
 - `src/features/library/`, `src/features/files/`: thư viện kết quả, kho tệp và xem nhanh.
 - `src/shared/hooks/useResource.ts`: tải dữ liệu có hủy yêu cầu khi rời trang, báo lỗi và thử lại.
 - `src/shared/`: API client, kiểu dữ liệu, hook tác vụ, thông báo và CSS dùng chung từ dự án gốc.
@@ -61,7 +62,7 @@ Thẻ dự án dẫn tới `/projects/:projectId`. Chọn tệp nguồn để xe
 
 Dấu mốc dùng `GET /api/projects/{id}/bookmarks?media_file_id={media_id}`, `POST /api/projects/{id}/bookmarks`, `PATCH /api/projects/{id}/bookmarks/{bookmark_id}` và `DELETE /api/projects/{id}/bookmarks/{bookmark_id}`. POST gửi `{ media_file_id, timestamp_ms, note }`; PATCH gửi `{ timestamp_ms, note }`. Thời điểm tính bằng mili giây, nằm trong thời lượng tệp khi đã biết; ghi chú tối đa 2.000 ký tự. Backend phải kiểm tra quyền truy cập dự án và chỉ trả/sửa dấu mốc của tài khoản hiện tại. Lỗi lưu giữ nguyên form, lỗi xóa giữ nguyên dấu mốc và có xác nhận trước khi xóa.
 
-Tab **Lịch sử xử lý** giữ bộ lọc tên tệp/mã tác vụ, trạng thái và trang trong URL. Tác vụ thành công có nút **Xem kết quả tác vụ**; bản ghi, OCR, biên bản và tệp tải xuống lấy từ lần xử lý đó, không thay bằng nguồn đang được chọn. Đây là màn hình đọc kết quả; các trình biên tập transcript, OCR và biên bản chưa nằm trong bản này.
+Tab **Lịch sử xử lý** giữ bộ lọc tên tệp/mã tác vụ, trạng thái và trang trong URL. Tác vụ thành công có nút **Xem kết quả tác vụ**; bản ghi, OCR, biên bản và tệp tải xuống lấy từ lần xử lý đó, không thay bằng nguồn đang được chọn. Đây là màn hình đọc kết quả. Chỉnh sửa transcript và OCR nằm trong các tab **Bản ghi** và **OCR**; trình biên tập biên bản chưa được công bố.
 
 Xử lý dùng `GET /api/system/capabilities`, `GET/POST /api/projects/{id}/jobs`, `GET /api/jobs/{id}`, `POST /api/jobs/{id}/cancel`, `POST /api/jobs/{id}/retry` và `GET /api/jobs/{id}/results`. Khi máy chủ yêu cầu thanh toán, giao diện hiển thị lỗi API; màn hình thanh toán được đưa lên riêng ở mục 17.
 
@@ -99,7 +100,7 @@ Phân trang và xóa hoạt động cần backend có API tương thích và mig
 
 Backend phải giới hạn dữ liệu theo tổ chức và kiểm tra lại quyền xóa hiện tại: log của bản thân, công ty thực sự đang sở hữu hoặc tổ chức do admin quản lý. Quyền xem dự án được chia sẻ không cho phép xóa log của cộng tác viên. Các cờ giao diện không thay thế kiểm tra quyền ở máy chủ. Đợt này chỉ công bố giao diện Dashboard; không kèm backend/migration hoặc thay đổi màn hình quản trị.
 
-Lưu ý kiểm tra nhánh: commit nền `844b58d` đã có `src/features/admin/AdminGuard.tsx` nhập hai module chưa công bố là `AdminConsole` và `CompaniesPage`. Do đó `npm run typecheck`, `npm run build` và CI chuẩn vẫn lỗi hai import này cho tới khi module quản trị được hoàn thiện. Đợt Dashboard giữ nguyên các tệp đó; toàn bộ kiểm thử frontend, kiểm tra kiểu phần source còn lại và Vite production bundle đã được xác minh riêng. Không thêm ngoại lệ vào cấu hình TypeScript hoặc CI của dự án.
+Lỗi import quản trị có trong commit nền `844b58d` đã được sửa ở `c2490ae`, bổ sung `AdminConsole` và `CompaniesPage` cùng các module liên quan. Nhánh hiện chạy toàn bộ test, typecheck và build với cấu hình TypeScript/CI chuẩn.
 
 Sau đăng ký thành công, giao diện chuyển về đăng nhập. Mật khẩu đăng ký dài 10–128 ký tự, có ít nhất một chữ A–Z và một chữ số. Khi triển khai bản build, cấu hình máy chủ phục vụ `index.html` cho các đường dẫn giao diện và chuyển tiếp `/api` tới máy chủ xác thực.
 
@@ -111,4 +112,14 @@ Open a project and choose **Bản ghi** to read and edit the transcript for the 
 
 Search links using `?tab=content&media=<id>&t=<milliseconds>` open the matching transcript and seek the selected media after metadata loads. The dedicated transcript tab uses `?tab=transcript`.
 
-This delivery requires the matching transcript, speaker and media APIs. Personal bookmarks remain for a later section 8 delivery. OCR, meeting minutes, notifications and payment modules are outside this delivery.
+This delivery requires the matching transcript, speaker and media APIs. Personal bookmarks are included in section 8. Meeting minutes, notifications and payment modules are outside this delivery.
+
+## OCR: mục 9
+
+Mở dự án, chọn tab **OCR** và tệp ảnh nguồn để đọc hoặc chỉnh sửa văn bản nhận dạng. URL `?tab=ocr&media=<id>` giữ đúng ảnh đã chọn; âm thanh/video không gọi API OCR. Người chỉ có quyền xem đọc được văn bản và lịch sử, không sửa được.
+
+OCR dùng `GET /api/projects/{id}/ocr?media_file_id={id}` và `GET /api/projects/{id}/ocr/versions?media_file_id={id}`. Lịch sử hiển thị từng bản chụp với revision, thời điểm và nội dung; không hỗ trợ khôi phục bản cũ. Chưa có OCR hiển thị trạng thái trống; lỗi tải có nút thử lại.
+
+Lưu dùng `PATCH /api/ocr/{ocr_document_id}` với `{ revision, text }`; cho phép văn bản trống, tối đa 2.000.000 ký tự. Lỗi lưu, gồm xung đột `409`, giữ bản nháp. Tải lại khi đang sửa cần xác nhận bỏ nháp. Trong lúc lưu hoặc tải lại, nút lưu bị khóa. Khi bản nháp chưa lưu, đổi/xóa nguồn và cài đặt bị khóa; rời tab/trang hoặc đóng trang được bảo vệ như trình biên tập transcript. Upload và bản thu âm đang làm vẫn được bảo vệ khi chuyển tab.
+
+Tác vụ xử lý hoàn tất tự tải OCR mới khi trình biên tập sạch. Nếu đang sửa, bản nháp được giữ; người dùng chủ động tải lại sau khi giữ nội dung cần thiết. Các kiểm thử dùng API giả lập; cần backend OCR tương thích để nhận dạng và lưu dữ liệu thật.
