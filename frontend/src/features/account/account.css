@@ -3,6 +3,10 @@
 .account-identity .avatar { width: 48px; height: 48px; font-size: 16px; }
 .account-identity p { color: var(--muted); margin-top: 3px; }
 .account-form { display: grid; gap: 16px; max-width: 560px; }
+.password-entry { display: flex; align-items: center; gap: 4px; border: 1px solid #dfe5ec; border-radius: 8px; background: white; padding-right: 4px; }
+.password-entry:focus-within { border-color: #4db5aa; box-shadow: 0 0 0 3px #0d94880b; }
+.password-entry input { border: 0; box-shadow: none; flex: 1; }
+.password-entry input:focus { outline: none; box-shadow: none; }
 .account-form > h2 { display: flex; align-items: center; gap: 8px; }
 .account-readonly { min-height: 40px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; background: #f9fbfc; color: #364154; }
 .account-readonly small { margin-left: auto; color: var(--muted); }

@@ -501,6 +501,21 @@ it("previews CSV glossary imports before creating each term", async () => {
   expect(host.textContent).not.toContain("Đã đọc 2 thuật ngữ");
 });
 
+it("reveals and hides each password field independently in account settings", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  await act(async () => host.querySelector<HTMLAnchorElement>('nav a[href="/settings"]')!.click());
+  const current = host.querySelector<HTMLInputElement>('[aria-label="Mật khẩu hiện tại"]')!;
+  const next = host.querySelector<HTMLInputElement>('[aria-label="Mật khẩu mới"]')!;
+  expect(current.type).toBe("password");
+  expect(next.type).toBe("password");
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Hiện mật khẩu mới"]')!.click());
+  expect(next.type).toBe("text");
+  expect(current.type).toBe("password");
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Ẩn mật khẩu mới"]')!.click());
+  expect(next.type).toBe("password");
+});
+
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
   fetchMock.mockResolvedValueOnce(Response.json(session));
