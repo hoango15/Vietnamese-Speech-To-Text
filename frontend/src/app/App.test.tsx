@@ -518,6 +518,10 @@ it("reveals and hides each password field independently in account settings", as
   expect(host.querySelectorAll(".password-rule.valid")).toHaveLength(1);
   await fill('[aria-label="Mật khẩu mới"]', "Abcdefghij1");
   expect(host.querySelectorAll(".password-rule.valid")).toHaveLength(3);
+  await fill('[aria-label="Mật khẩu hiện tại"]', "Abcdefghij1");
+  await fill('[aria-label="Xác nhận mật khẩu mới"]', "Abcdefghij1");
+  expect(host.querySelector(".account-validation")?.textContent).toContain("khác mật khẩu hiện tại");
+  expect(host.querySelector<HTMLButtonElement>(".settings-page .form-actions button")?.disabled).toBe(true);
 });
 
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
