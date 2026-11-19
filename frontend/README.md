@@ -48,7 +48,7 @@ Sau đăng nhập, Dashboard gọi `GET /api/dashboard` và hiển thị tổng 
 
 Dashboard có xóa từng nhật ký và **Xóa tất cả** nhật ký được phép xóa trên mọi trang. Cả hai thao tác đều yêu cầu xác nhận, không thể hoàn tác qua giao diện. Nút xóa từng dòng chỉ xuất hiện khi API trả `can_delete`; xóa tất cả bị khóa khi không có quyền, đang tải/xóa hoặc tải lỗi. Xóa thành công sẽ tải lại trang hiện tại và lùi về trang còn dữ liệu nếu trang cuối đã hết. Hủy xác nhận hoặc yêu cầu lỗi không tự xóa bản ghi trên giao diện.
 
-Từ điển thuật ngữ gọi `GET /api/glossaries?q=...&language_code=...&page=...&page_size=20`, `POST /api/glossaries`, `PATCH /api/glossaries/{term_id}` và `DELETE /api/glossaries/{term_id}`. Mỗi thuật ngữ có `term_id`, `term`, `definition`, `language_code`, `category` và `updated_at`; danh sách theo kiểu `{ items, total }`.
+Từ điển thuật ngữ gọi `GET /api/glossaries?q=...&language_code=...&page=...&page_size=20`, `POST /api/glossaries`, `PATCH /api/glossaries/{term_id}` và `DELETE /api/glossaries/{term_id}`. Mỗi thuật ngữ có `term_id`, `term`, `definition`, `language_code`, `category` và `updated_at`; danh sách theo kiểu `{ items, total }`. Có thể sắp xếp thuật ngữ theo tên tiếng Việt hoặc theo lần cập nhật trong trang hiện tại.
 
 Tìm kiếm bản chép lời gọi `GET /api/search/transcripts?q=...&page=...&page_size=20`; kết quả theo kiểu `{ items, total }`, mỗi dòng có `project_id`, `project_title`, `media_file_id`, `segment_no`, `start_ms`, `end_ms`, `segment_text` và tùy chọn `segment_id`, `speaker_name`. Backend phải giới hạn kết quả theo quyền truy cập dự án của tài khoản.
 

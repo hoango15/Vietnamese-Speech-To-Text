@@ -3,6 +3,8 @@
 .glossary-search input { flex: 1; }
 .glossary-language-filter { display: flex; flex-direction: row; align-items: center; gap: 10px; width: fit-content; }
 .glossary-language-filter select { min-width: 180px; font: inherit; color: #364154; border: 1px solid #dfe5ec; border-radius: 8px; padding: 9px 11px; background: white; }
+.glossary-sort-filter { display: flex; flex-direction: row; align-items: center; gap: 10px; width: fit-content; }
+.glossary-sort-filter select { min-width: 150px; font: inherit; color: #364154; border: 1px solid #dfe5ec; border-radius: 8px; padding: 9px 11px; background: white; }
 .glossary-form { border: 1px solid var(--border); background: #fbfdfd; border-radius: 10px; padding: 18px; display: grid; gap: 16px; }
 .glossary-fields { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; }
 .glossary-fields textarea, .glossary-fields select { font: inherit; color: #364154; border: 1px solid #dfe5ec; border-radius: 8px; padding: 10px 12px; background: white; }

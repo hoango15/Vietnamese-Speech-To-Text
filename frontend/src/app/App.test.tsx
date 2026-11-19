@@ -455,12 +455,19 @@ it("filters glossary terms by language without changing their content", async ()
   fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
     if (url.startsWith("/api/glossaries?")) {
       const english = url.includes("language_code=en");
-      return Response.json({ items: [{ term_id: english ? "en-1" : "vi-1", term: english ? "meeting" : "cuộc họp", definition: "Nội dung trao đổi", language_code: english ? "en" : "vi", updated_at: "2026-11-19T00:00:00Z" }], total: 1 });
+      return Response.json({ items: english ? [
+        { term_id: "en-1", term: "meeting", definition: "Nội dung trao đổi", language_code: "en", updated_at: "2026-11-19T00:00:00Z" },
+      ] : [
+        { term_id: "vi-1", term: "cuộc họp", definition: "Nội dung trao đổi", language_code: "vi", updated_at: "2026-11-19T02:00:00Z" },
+        { term_id: "vi-2", term: "Áp dụng", definition: "Dùng vào thực tế", language_code: "vi", updated_at: "2026-11-19T01:00:00Z" },
+      ], total: english ? 1 : 2 });
     }
     return defaultFetch(url, options);
   });
   await act(async () => host.querySelector<HTMLAnchorElement>('nav a[href="/glossaries"]')!.click());
   expect(host.querySelector(".glossary-term-title h2")?.textContent).toBe("cuộc họp");
+  await choose('[aria-label="Sắp xếp thuật ngữ"]', "term");
+  expect(host.querySelector(".glossary-term-title h2")?.textContent).toBe("Áp dụng");
   await choose('[aria-label="Lọc thuật ngữ theo ngôn ngữ"]', "en");
   expect(host.querySelector(".glossary-term-title h2")?.textContent).toBe("meeting");
   expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/glossaries?q=&page=1&page_size=20&language_code=en");
