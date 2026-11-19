@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Bell, CheckCheck, ExternalLink } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../shared/api/client";
@@ -28,10 +28,8 @@ type NotificationPage = List<AppNotification> & {
 
 export function NotificationsPage() {
   const [params, setParams] = useSearchParams();
-  const [page, setPage] = useState(() => {
-    const value = Number(params.get("page") ?? 1);
-    return Number.isSafeInteger(value) && value > 0 ? value : 1;
-  });
+  const requestedPage = Number(params.get("page") ?? 1);
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const unreadOnly = params.get("unread") === "true";
   const typeCode = params.get("type") ?? "";
   const path = `/notifications?unread_only=${unreadOnly}&page=${page}&page_size=20${typeCode ? `&type_code=${encodeURIComponent(typeCode)}` : ""}`;
@@ -45,13 +43,17 @@ export function NotificationsPage() {
     else next.delete("unread");
     next.delete("page");
     setParams(next);
-    setPage(1);
   };
   const selectType = (value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set("type", value); else next.delete("type");
+    next.delete("page");
     setParams(next);
-    setPage(1);
+  };
+  const selectPage = (value: number) => {
+    const next = new URLSearchParams(params);
+    if (value > 1) next.set("page", String(value)); else next.delete("page");
+    setParams(next);
   };
   const notificationTypes = [...(resource.data?.notification_types ?? [...new Set(resource.data?.items.map(item => item.notification_type_code) ?? [])]
     .map(code => ({ code, label: code.toLocaleLowerCase().replaceAll("_", " ") })))];
@@ -86,7 +88,7 @@ export function NotificationsPage() {
             resource.reload();
           }, "Đã đánh dấu thông báo là đã đọc.")}>Đánh dấu đã đọc</button>}
         </article>)}</div>
-        <Pagination page={page} total={resource.data.total} onChange={setPage} />
+        <Pagination page={page} total={resource.data.total} onChange={selectPage} />
       </> : <Empty title={unreadOnly ? "Không còn thông báo chưa đọc" : "Chưa có thông báo"} description={unreadOnly ? "Bạn đã đọc hết thông báo của mình." : "Thông báo về dự án và hoạt động sẽ xuất hiện tại đây."} />}
     </section>
   </>;

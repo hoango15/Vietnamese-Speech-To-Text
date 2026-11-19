@@ -431,6 +431,23 @@ it("loads notifications and marks a selected item as read", async () => {
   expect(host.querySelector(".notification-count-badge")).toBeNull();
 });
 
+it("restores notification filters and pagination from the URL", async () => {
+  window.history.replaceState(null, "", "/notifications?unread=true&type=JOB_FAILED&page=2");
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+    if (url === "/api/notifications?unread_only=true&page=2&page_size=20&type_code=JOB_FAILED") return Response.json({
+      items: [{ notification_id: "n21", notification_type_code: "JOB_FAILED", title: "Tác vụ thất bại", message: "Hãy thử lại.", created_at: "2026-11-19T10:00:00Z", read_at: null }],
+      total: 21, unread_count: 3, notification_types: [{ code: "JOB_FAILED", label: "Xử lý thất bại" }],
+    });
+    return defaultFetch(url, options);
+  });
+  await renderApp();
+  expect(window.location.search).toBe("?unread=true&type=JOB_FAILED&page=2");
+  expect(host.querySelector(".pagination")?.textContent).toContain("Trang 2/2");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/notifications?unread_only=true&page=2&page_size=20&type_code=JOB_FAILED");
+});
+
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
   fetchMock.mockResolvedValueOnce(Response.json(session));
