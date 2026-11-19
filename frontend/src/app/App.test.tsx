@@ -366,14 +366,18 @@ it("routes header search and loads transcript matches for the trimmed query", as
   await renderApp();
   const defaultFetch = fetchMock.getMockImplementation()!;
   fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
-    if (url.startsWith("/api/search/transcripts?")) return Response.json({
-      items: [{
-        project_id: "project-1", project_title: "Cuộc họp tuần", media_file_id: "media-1",
-        segment_no: 2, start_ms: 65000, end_ms: 69000, segment_text: "Tiếng Việt và phụ đề",
-        speaker_name: "Nguyễn An",
-      }],
-      total: 1,
-    });
+    if (url.startsWith("/api/search/transcripts?")) {
+      const filtered = url.includes("project_id=project-2");
+      return Response.json({
+        items: [{
+          project_id: filtered ? "project-2" : "project-1", project_title: filtered ? "Dự án lọc" : "Cuộc họp tuần", media_file_id: "media-1",
+          segment_no: 2, start_ms: 65000, end_ms: 69000, segment_text: "Tiếng Việt và phụ đề",
+          speaker_name: "Nguyễn An",
+        }],
+        total: 1,
+        projects: [{ project_id: "project-1", project_title: "Cuộc họp tuần" }, { project_id: "project-2", project_title: "Dự án lọc" }],
+      });
+    }
     return defaultFetch(url, options);
   });
   expect(host.querySelector(".top-search")).not.toBeNull();
@@ -388,6 +392,9 @@ it("routes header search and loads transcript matches for the trimmed query", as
     "/api/search/transcripts?q=ti%E1%BA%BFng%20Vi%E1%BB%87t%20%26%20ph%E1%BB%A5%20%C4%91%E1%BB%81&page=1&page_size=20",
   );
   expect(fetchMock).toHaveBeenCalledTimes(4);
+  await choose('[aria-label="Lọc kết quả theo dự án"]', "project-2");
+  expect(host.querySelector(".search-result-body > a strong")?.textContent).toBe("Dự án lọc");
+  expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/search/transcripts?q=ti%E1%BA%BFng%20Vi%E1%BB%87t%20%26%20ph%E1%BB%A5%20%C4%91%E1%BB%81&page=1&page_size=20&project_id=project-2");
 });
 
 it("loads notifications and marks a selected item as read", async () => {

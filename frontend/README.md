@@ -50,7 +50,7 @@ Dashboard có xóa từng nhật ký và **Xóa tất cả** nhật ký được
 
 Từ điển thuật ngữ gọi `GET /api/glossaries?q=...&language_code=...&page=...&page_size=20`, `POST /api/glossaries`, `PATCH /api/glossaries/{term_id}` và `DELETE /api/glossaries/{term_id}`. Mỗi thuật ngữ có `term_id`, `term`, `definition`, `language_code`, `category` và `updated_at`; danh sách theo kiểu `{ items, total }`. Có thể sắp xếp thuật ngữ theo tên tiếng Việt hoặc lần cập nhật trong trang hiện tại, xuất trang hiện tại thành CSV UTF-8, và nhập CSV qua các yêu cầu tạo thuật ngữ tuần tự (tối đa 500 dòng, tệp tối đa 1 MB).
 
-Tìm kiếm bản chép lời gọi `GET /api/search/transcripts?q=...&page=...&page_size=20`; kết quả theo kiểu `{ items, total }`, mỗi dòng có `project_id`, `project_title`, `media_file_id`, `segment_no`, `start_ms`, `end_ms`, `segment_text` và tùy chọn `segment_id`, `speaker_name`. Backend phải giới hạn kết quả theo quyền truy cập dự án của tài khoản.
+Tìm kiếm bản chép lời gọi `GET /api/search/transcripts?q=...&page=...&page_size=20&project_id=...`; kết quả theo kiểu `{ items, total, projects? }`, mỗi dòng có `project_id`, `project_title`, `media_file_id`, `segment_no`, `start_ms`, `end_ms`, `segment_text` và tùy chọn `segment_id`, `speaker_name`. Bộ lọc dự án hiện khi có nhiều dự án trong phạm vi tìm kiếm. Backend phải giới hạn kết quả theo quyền truy cập dự án của tài khoản.
 
 Hồ sơ gọi `GET /api/users/me` và `PATCH /api/users/me` với `{ full_name }`; phản hồi dùng kiểu `User`. Cài đặt mật khẩu gọi `PATCH /api/auth/password` với `{ current_password, new_password }`. Các endpoint này cần được hỗ trợ bởi backend để lưu dữ liệu thật; frontend hiển thị lỗi API nếu máy chủ chưa triển khai.
 
