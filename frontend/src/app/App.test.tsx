@@ -381,6 +381,38 @@ it("routes header search and loads transcript matches for the trimmed query", as
   expect(fetchMock).toHaveBeenCalledTimes(4);
 });
 
+it("loads notifications and marks a selected item as read", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  let notificationReads = 0;
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+    if (url === "/api/notifications?unread_only=false&page=1&page_size=20") {
+      notificationReads++;
+      return Response.json({
+        items: [{
+          notification_id: "notification-1", notification_type_code: "PROJECT_UPDATE",
+          title: "Dự án được cập nhật", message: "An đã cập nhật cuộc họp tuần.",
+          created_at: "2026-11-19T10:00:00Z", read_at: notificationReads > 1 ? "2026-11-19T11:00:00Z" : null,
+          project_id: "project-1", project_title: "Cuộc họp tuần",
+        }],
+        total: 1, unread_count: notificationReads > 1 ? 0 : 1,
+      });
+    }
+    if (url === "/api/notifications/notification-1/read") return new Response(null, { status: 204 });
+    return defaultFetch(url, options);
+  });
+  await act(async () => host.querySelector<HTMLAnchorElement>('[aria-label="Thông báo"]')!.click());
+  expect(host.querySelector("main h1")?.textContent).toBe("Thông báo");
+  expect(host.querySelector(".notification-item")?.textContent).toContain("An đã cập nhật cuộc họp tuần.");
+  expect(host.querySelector('.notification-project[href="/projects/project-1"]')?.textContent).toContain("Cuộc họp tuần");
+  await click("Đánh dấu đã đọc");
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(fetchMock.mock.calls.map(([url, options]) => [url, (options as RequestInit | undefined)?.method]))
+    .toContainEqual(["/api/notifications/notification-1/read", "PATCH"]);
+  expect(host.querySelector(".notification-item")?.classList.contains("is-read")).toBe(true);
+});
+
 it("traps mobile menu focus and restores focus and scrolling after Escape", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
   fetchMock.mockResolvedValueOnce(Response.json(session));

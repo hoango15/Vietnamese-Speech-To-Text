@@ -33,6 +33,7 @@ npm run build
 - `src/features/projects/exports/`: xuất tệp và phụ đề video.
 - `src/features/projects/bookmarks/`: dấu mốc và ghi chú cá nhân theo từng tệp âm thanh/video; tạo, sửa, xóa và tua đến thời điểm đã lưu.
 - `src/features/projects/ocr/`: xem, chỉnh sửa và lịch sử OCR theo từng tệp ảnh; lưu theo revision và bảo vệ bản nháp.
+- `src/features/notifications/`: danh sách thông báo, lọc chưa đọc, đánh dấu đã đọc từng mục hoặc tất cả.
 - `src/features/library/`, `src/features/files/`: thư viện kết quả, kho tệp và xem nhanh.
 - `src/shared/hooks/useResource.ts`: tải dữ liệu có hủy yêu cầu khi rời trang, báo lỗi và thử lại.
 - `src/shared/`: API client, kiểu dữ liệu, hook tác vụ, thông báo và CSS dùng chung từ dự án gốc.
@@ -53,8 +54,9 @@ Tìm kiếm bản chép lời gọi `GET /api/search/transcripts?q=...&page=...&
 
 Hồ sơ gọi `GET /api/users/me` và `PATCH /api/users/me` với `{ full_name }`; phản hồi dùng kiểu `User`. Cài đặt mật khẩu gọi `PATCH /api/auth/password` với `{ current_password, new_password }`. Các endpoint này cần được hỗ trợ bởi backend để lưu dữ liệu thật; frontend hiển thị lỗi API nếu máy chủ chưa triển khai.
 
-Các mục thư viện biên bản/phụ đề, kho tệp, thanh toán, thông báo và quản trị hiện vẫn có màn hình chờ bổ sung. Ô tìm kiếm trên header chuyển tới trang tìm kiếm bản chép lời.
-Các mục từ điển và tìm kiếm đã có giao diện và gọi API riêng. Hồ sơ và cài đặt tài khoản được triển khai trong commit tiếp theo.
+Thanh toán hiện vẫn có màn hình chờ bổ sung. Ô tìm kiếm trên header chuyển tới trang tìm kiếm bản chép lời; từ điển và tìm kiếm gọi API riêng, còn hồ sơ và cài đặt tài khoản có trang riêng.
+
+Thông báo gọi `GET /api/notifications?unread_only=...&page=...&page_size=20`, `PATCH /api/notifications/{notification_id}/read` và `POST /api/notifications/read-all`. Danh sách theo kiểu `{ items, total, unread_count }`; mỗi mục có `notification_id`, `notification_type_code`, `title`, `message`, `created_at`, `read_at` và tùy chọn `project_id`, `project_title`. Backend cần giới hạn dữ liệu theo tài khoản hiện tại.
 
 Thẻ dự án dẫn tới `/projects/:projectId`. Chọn tệp nguồn để xem trước và bắt đầu xử lý; giao diện kiểm tra quyền sửa, khả năng máy chủ và tác vụ đang chạy trước khi cho gửi yêu cầu. Trạng thái tác vụ cập nhật mỗi 2 giây, đồng hồ xử lý cập nhật mỗi giây và dừng khi tác vụ kết thúc. API vẫn phải kiểm tra quyền và ngăn tác vụ trùng trên máy chủ.
 
@@ -112,7 +114,7 @@ Open a project and choose **Bản ghi** to read and edit the transcript for the 
 
 Search links using `?tab=content&media=<id>&t=<milliseconds>` open the matching transcript and seek the selected media after metadata loads. The dedicated transcript tab uses `?tab=transcript`.
 
-This delivery requires the matching transcript, speaker and media APIs. Personal bookmarks are included in section 8. Meeting minutes, notifications and payment modules are outside this delivery.
+This delivery requires the matching transcript, speaker and media APIs. Personal bookmarks are included in section 8. Notifications are available in section 15; payment is tracked separately in section 17.
 
 ## OCR: mục 9
 

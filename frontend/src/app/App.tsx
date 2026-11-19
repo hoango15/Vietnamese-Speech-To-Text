@@ -13,6 +13,7 @@ import { GlossaryPage } from "../features/glossary/GlossaryPage";
 import { SearchPage } from "../features/search/SearchPage";
 import { ProfilePage } from "../features/account/ProfilePage";
 import { SettingsPage } from "../features/account/SettingsPage";
+import { NotificationsPage } from "../features/notifications/NotificationsPage";
 import { LogoutPage } from "../features/auth/LogoutPage";
 import { Loading } from "../shared/ui/components";
 import { NoticeProvider } from "../shared/ui/NoticeProvider";
@@ -58,7 +59,8 @@ export default function App() {
           { path: "search", element: <SearchPage /> },
           { path: "profile", element: <ProfilePage /> },
           { path: "settings", element: <SettingsPage /> },
-          ...workspaceSections.filter((section) => !["/", "/my-projects", "/glossaries", "/search", "/profile", "/settings"].includes(section.path)).map((section) => ({
+          { path: "notifications", element: <NotificationsPage /> },
+          ...workspaceSections.filter((section) => !["/", "/my-projects", "/glossaries", "/search", "/profile", "/settings", "/notifications"].includes(section.path)).map((section) => ({
             path: section.path === "/projects" ? "projects/*" : section.path.slice(1),
             element: <WorkspaceSection section={section} />,
           })),
