@@ -8,6 +8,7 @@
 .glossary-form { border: 1px solid var(--border); background: #fbfdfd; border-radius: 10px; padding: 18px; display: grid; gap: 16px; }
 .glossary-fields { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; }
 .glossary-fields textarea, .glossary-fields select { font: inherit; color: #364154; border: 1px solid #dfe5ec; border-radius: 8px; padding: 10px 12px; background: white; }
+.glossary-character-count { align-self: flex-end; color: var(--muted); font-size: 10px; font-weight: 400; }
 .glossary-wide { grid-column: 1 / -1; }
 .glossary-list { display: grid; gap: 10px; }
 .glossary-term { border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }

@@ -124,6 +124,15 @@ async function choose(selector: string, value: string) {
   });
 }
 
+async function fillTextArea(selector: string, value: string) {
+  const area = host.querySelector<HTMLTextAreaElement>(selector)!;
+  expect(area).not.toBeNull();
+  await act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(area, value);
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
 async function submit() {
   await act(async () => {
     host.querySelector("form")!.requestSubmit();
@@ -497,6 +506,20 @@ it("filters glossary terms by language without changing their content", async ()
   await choose('[aria-label="Lọc thuật ngữ theo ngôn ngữ"]', "en");
   expect(host.querySelector(".glossary-term-title h2")?.textContent).toBe("meeting");
   expect(fetchMock.mock.calls.map(([url]) => url)).toContain("/api/glossaries?q=&page=1&page_size=20&language_code=en");
+});
+
+it("shows live character counts while creating glossary terms", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  const defaultFetch = fetchMock.getMockImplementation()!;
+  fetchMock.mockImplementation(async (url: string, options?: RequestInit) =>
+    url.startsWith("/api/glossaries?") ? Response.json({ items: [], total: 0 }) : defaultFetch(url, options));
+  await act(async () => host.querySelector<HTMLAnchorElement>('nav a[href="/glossaries"]')!.click());
+  await click("Thêm thuật ngữ");
+  await fill('[name="term"]', "Xin chào");
+  await fillTextArea('[name="definition"]', "Hello there");
+  expect(host.querySelector('[name="term"]')?.parentElement?.textContent).toContain("8/160 ký tự");
+  expect(host.querySelector('[name="definition"]')?.parentElement?.textContent).toContain("11/4.000 ký tự");
 });
 
 it("previews CSV glossary imports before creating each term", async () => {
