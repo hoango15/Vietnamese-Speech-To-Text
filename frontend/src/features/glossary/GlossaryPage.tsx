@@ -10,9 +10,9 @@ import "./glossary.css";
 interface GlossaryTerm { term_id: string; term: string; definition: string; language_code: string; category?: string | null; updated_at: string }
 
 export function GlossaryPage() {
-  const [q, setQ] = useState(""), [draft, setDraft] = useState(""), [page, setPage] = useState(1);
+  const [q, setQ] = useState(""), [draft, setDraft] = useState(""), [page, setPage] = useState(1), [language, setLanguage] = useState("");
   const [editing, setEditing] = useState<GlossaryTerm | null>(null);
-  const path = `/glossaries?q=${encodeURIComponent(q)}&page=${page}&page_size=20`;
+  const path = `/glossaries?q=${encodeURIComponent(q)}&page=${page}&page_size=20${language ? `&language_code=${encodeURIComponent(language)}` : ""}`;
   const resource = useResource<List<GlossaryTerm>>(path), action = useAction();
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -34,6 +34,7 @@ export function GlossaryPage() {
         <input id="glossary-query" value={draft} onChange={e => setDraft(e.target.value)} placeholder="Tìm thuật ngữ hoặc phần giải thích" />
         <button className="button secondary" type="submit">Tìm kiếm</button>
       </form>
+      <label className="glossary-language-filter">Lọc ngôn ngữ<select aria-label="Lọc thuật ngữ theo ngôn ngữ" value={language} onChange={event => { setLanguage(event.target.value); setPage(1); }}><option value="">Tất cả ngôn ngữ</option><option value="vi">Tiếng Việt</option><option value="en">Tiếng Anh</option></select></label>
       {editing || draft === "new" ? <form className="glossary-form" onSubmit={save}>
         <h2>{editing ? "Sửa thuật ngữ" : "Thêm thuật ngữ"}</h2>
         <div className="glossary-fields"><label>Thuật ngữ<input name="term" required maxLength={160} defaultValue={editing?.term ?? ""} /></label>
