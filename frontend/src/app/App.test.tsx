@@ -401,6 +401,17 @@ it("routes header search and loads transcript matches for the trimmed query", as
   expect(host.querySelector(".empty")?.textContent).toContain("Nhập từ khóa");
 });
 
+it("focuses the workspace search with Control-K", async () => {
+  fetchMock.mockResolvedValueOnce(Response.json(session));
+  await renderApp();
+  const search = host.querySelector<HTMLInputElement>('[aria-label="Tìm kiếm nội dung bản chép lời"]')!;
+  const shortcut = new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true, cancelable: true });
+  await act(() => document.dispatchEvent(shortcut));
+  expect(shortcut.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(search);
+  expect(search.getAttribute("aria-keyshortcuts")).toBe("Control+K Meta+K");
+});
+
 it("loads notifications and marks a selected item as read", async () => {
   fetchMock.mockResolvedValueOnce(Response.json(session));
   await renderApp();

@@ -16,6 +16,7 @@ export function WorkspaceLayout() {
   const location = useLocation();
   const sidebarRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setUnreadNotifications(Math.max(0, user?.unread_notification_count ?? 0));
@@ -28,6 +29,17 @@ export function WorkspaceLayout() {
     };
     window.addEventListener("notifications:unread-count", updateCount);
     return () => window.removeEventListener("notifications:unread-count", updateCount);
+  }, []);
+
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return;
+      event.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    };
+    document.addEventListener("keydown", shortcut);
+    return () => document.removeEventListener("keydown", shortcut);
   }, []);
 
   useEffect(() => {
@@ -160,6 +172,8 @@ export function WorkspaceLayout() {
               <Search size={17} />
               <input
                 aria-label="Tìm kiếm nội dung bản chép lời"
+                aria-keyshortcuts="Control+K Meta+K"
+                ref={searchRef}
                 placeholder="Tìm nội dung bản chép lời…"
                 maxLength={300}
                 value={q}
