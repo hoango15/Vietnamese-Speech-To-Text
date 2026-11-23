@@ -1,7 +1,7 @@
 from datetime import date
 import hashlib
 import json
-from typing import Literal
+from typing import Annotated,Literal
 from uuid import UUID,uuid4
 from fastapi import APIRouter,Depends,HTTPException,Query
 from fastapi.responses import FileResponse,Response
@@ -20,7 +20,8 @@ router=APIRouter()
 
 def minutes_data(conn,row):
     source=one(conn,'SELECT media_file_id FROM transcript WHERE transcript_id=%s',(row['transcript_id'],))
-    return {**row,'media_file_id':source['media_file_id'],
+    return {**row,'meeting_time':row['meeting_time'].strftime('%H:%M') if row['meeting_time'] else None,
+        'media_file_id':source['media_file_id'],
         'topics':all_rows(conn,'SELECT * FROM minutes_topic WHERE minutes_id=%s ORDER BY topic_no',(row['minutes_id'],)),
         'decisions':all_rows(conn,'SELECT * FROM minutes_decision WHERE minutes_id=%s ORDER BY decision_no',(row['minutes_id'],)),
         'action_items':all_rows(conn,'SELECT * FROM action_item WHERE minutes_id=%s ORDER BY action_item_id',(row['minutes_id'],))}
@@ -29,8 +30,11 @@ def minutes_data(conn,row):
 def insert_minutes(conn,pid,tid,title,body,model='local-extractive',meeting_date=None):
     conn.execute('SELECT project_id FROM project WHERE project_id=%s FOR UPDATE',(pid,))
     version=one(conn,'SELECT COALESCE(max(version_no),0)+1 AS n FROM minutes WHERE project_id=%s',(pid,))['n']
-    row=one(conn,'''INSERT INTO minutes(project_id,transcript_id,version_no,meeting_title,meeting_date,summary_text,llm_model_name)
-        VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING *''',(pid,tid,version,title,meeting_date,body.get('summary_text',''),model))
+    row=one(conn,'''INSERT INTO minutes(project_id,transcript_id,version_no,meeting_title,meeting_date,meeting_time,
+        participants,notes_text,summary_text,llm_model_name)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *''',
+        (pid,tid,version,body.get('meeting_title') or title,meeting_date if meeting_date is not None else body.get('meeting_date'),
+         body.get('meeting_time'),body.get('participants') or [],body.get('notes_text') or '',body.get('summary_text',''),model))
     mid=row['minutes_id']
     for i,t in enumerate(body.get('topics',[]),1):
         conn.execute('INSERT INTO minutes_topic(minutes_id,topic_no,topic_title,topic_summary,source_start_ms) VALUES (%s,%s,%s,%s,%s)',
@@ -39,8 +43,8 @@ def insert_minutes(conn,pid,tid,title,body,model='local-extractive',meeting_date
         conn.execute('INSERT INTO minutes_decision(minutes_id,decision_no,decision_text,source_start_ms) VALUES (%s,%s,%s,%s)',
                      (mid,i,d['decision_text'],d.get('source_start_ms')))
     for a in body.get('action_items',[]):
-        conn.execute('''INSERT INTO action_item(minutes_id,item_description,assignee_name,due_date,action_item_status_code,source_start_ms)
-            VALUES (%s,%s,%s,%s,%s,%s)''',(mid,a['item_description'],a.get('assignee_name'),a.get('due_date'),a.get('action_item_status_code','OPEN'),a.get('source_start_ms')))
+        conn.execute('''INSERT INTO action_item(minutes_id,item_title,item_description,assignee_name,due_date,action_item_status_code,source_start_ms)
+            VALUES (%s,%s,%s,%s,%s,%s,%s)''',(mid,a.get('item_title'),a['item_description'],a.get('assignee_name'),a.get('due_date'),a.get('action_item_status_code'),a.get('source_start_ms')))
     return minutes_data(conn,row)
 
 
@@ -81,8 +85,8 @@ def generate(project_id:UUID,media_file_id:UUID|None=None,user=Depends(current_u
     with connection() as conn:
         p=project(conn,user,project_id,write=True)
         conn.execute('SELECT project_id FROM project WHERE project_id=%s FOR UPDATE',(project_id,))
-        current=one(conn,'SELECT transcript_id FROM transcript WHERE project_id=%s AND media_file_id IS NOT DISTINCT FROM %s AND is_current',(project_id,t['media_file_id']))
-        if not current or current['transcript_id']!=t['transcript_id']:
+        current=one(conn,'SELECT transcript_id,revision FROM transcript WHERE project_id=%s AND media_file_id IS NOT DISTINCT FROM %s AND is_current',(project_id,t['media_file_id']))
+        if not current or current['transcript_id']!=t['transcript_id'] or current['revision']!=t['revision']:
             raise HTTPException(409,'Transcript đã thay đổi trong khi tạo biên bản. Hãy tải lại và thử lại.')
         out=insert_minutes(conn,project_id,t['transcript_id'],p['project_title'],body,model=model)
         audit(conn,user['user_id'],'GENERATE_MINUTES','project',project_id)
@@ -101,16 +105,20 @@ class DecisionBody(StrictBody):
 
 
 class ActionBody(StrictBody):
+    item_title:str|None=Field(default=None,max_length=300)
     item_description:str=Field(min_length=1,max_length=10000)
     assignee_name:str|None=Field(default=None,max_length=200)
     due_date:date|None=None
-    action_item_status_code:Literal['OPEN','IN_PROGRESS','DONE','CANCELED']='OPEN'
+    action_item_status_code:Literal['OPEN','IN_PROGRESS','DONE','CANCELED']|None=None
     source_start_ms:int|None=Field(default=None,ge=0)
 
 
 class MinutesBody(StrictBody):
     meeting_title:str=Field(min_length=1,max_length=300)
     meeting_date:date|None=None
+    meeting_time:str|None=Field(default=None,pattern=r'^(?:[01][0-9]|2[0-3]):[0-5][0-9]$')
+    participants:list[Annotated[str,Field(min_length=1,max_length=200)]]=Field(default_factory=list,max_length=1000)
+    notes_text:str=Field(default='',max_length=1000000)
     summary_text:str=Field(default='',max_length=1000000)
     topics:list[TopicBody]=Field(default_factory=list,max_length=100)
     decisions:list[DecisionBody]=Field(default_factory=list,max_length=20000)
@@ -242,10 +250,12 @@ def source_data(conn,pid,source,transcript_id=None,media_file_id=None):
     m=one(conn,'SELECT * FROM minutes WHERE project_id=%s AND transcript_id=%s ORDER BY version_no DESC LIMIT 1',(pid,t['transcript_id']))
     if not m:raise HTTPException(409,'Chưa có biên bản cho transcript hiện tại')
     m=minutes_data(conn,m)
-    text=m['meeting_title']+'\n'+str(m['meeting_date'] or '')+'\n\n'+(m['summary_text'] or '')
+    text=(m['meeting_title'] or '')+'\n'+str(m['meeting_date'] or '')+'\nGiờ: '+(m['meeting_time'] or '')
+    text+='\nThành phần: '+', '.join(m['participants'])+'\n\n'+(m['summary_text'] or '')
     for top in m['topics']:text+='\n\n'+top['topic_title']+'\n'+(top['topic_summary'] or '')
     text+='\n\nQUYẾT ĐỊNH\n'+('\n'.join('- '+d['decision_text'] for d in m['decisions']) or 'Chưa xác định')
-    text+='\n\nCÔNG VIỆC\n'+('\n'.join('- '+a['item_description']+' | '+(a['assignee_name'] or 'Chưa xác định')+' | '+str(a['due_date'] or 'Chưa xác định')+' | '+a['action_item_status_code'] for a in m['action_items']) or 'Chưa xác định')
+    text+='\n\nCÔNG VIỆC\n'+('\n'.join('- '+(a['item_title'] or '')+' | '+a['item_description']+' | '+(a['assignee_name'] or '')+' | '+str(a['due_date'] or '')+' | '+(a['action_item_status_code'] or '') for a in m['action_items']) or 'Chưa xác định')
+    text+='\n\nGHI CHÚ\n'+m['notes_text']
     return t['transcript_id'],text,[],[]
 
 
