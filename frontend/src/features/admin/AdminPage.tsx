@@ -384,3 +384,5 @@ export function AdminPage({ embedded = false }: { embedded?: boolean }) {
     </>
   );
 }
+
+// Màn hình qu?n tr? ngu?i dùng và c?u hình h? th?ng
