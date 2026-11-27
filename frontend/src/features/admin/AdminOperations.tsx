@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { RefreshCw, Search } from "lucide-react";
-import type { Audit, Job, List } from "../../shared/types";
+import { RefreshCw, Search, Trash2 } from "lucide-react";
+import type { Audit, AuditList, Job, List } from "../../shared/types";
 import { useResource } from "../../shared/hooks/useResource";
 import { bytes, date } from "../../shared/lib/format";
 import { Empty, ErrorBox, Loading, Modal, PageTitle, Pagination, Status } from "../../shared/ui/components";
 import { JobCard } from "../projects/jobs/JobCard";
+import { useAuditDeletion } from "../activity/useAuditDeletion";
 
-function useConsoleList<T>(path: string) {
+function useConsoleList<T, Data extends List<T> = List<T>>(path: string) {
   const [params, setParams] = useSearchParams();
   const rawPage = Number(params.get("page") ?? 1);
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
-  const query = new URLSearchParams(params); query.set("page", String(page));
-  const resource = useResource<List<T>>(path + "?" + query);
+  const query = new URLSearchParams(params); query.set("page", String(page)); query.set("page_size", "20");
+  const resource = useResource<Data>(path + "?" + query);
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value); else next.delete(key);
@@ -68,12 +69,18 @@ export function AdminUploads() {
   </>;
 }
 export function AdminAudit() {
-  const list = useConsoleList<Audit>("/admin/audit");
-  return <><PageTitle title="Nhật ký hoạt động" subtitle="Tra cứu người thực hiện và thay đổi trong workspace."><button className="button secondary" disabled={list.loading} onClick={list.reload}><RefreshCw size={16} />Làm mới</button></PageTitle>
+  const list = useConsoleList<Audit, AuditList>("/admin/audit");
+  const deletion = useAuditDeletion(list.reload);
+  useEffect(() => {
+    if (list.loading || list.error || !list.data) return;
+    const lastPage = Math.max(1, Math.ceil(list.data.total / 20));
+    if (list.page > lastPage) list.update("page", String(lastPage));
+  }, [list.loading, list.error, list.data, list.page, list.update]);
+  return <><PageTitle title="Nhật ký hoạt động" subtitle="Tra cứu người thực hiện và thay đổi trong workspace."><button className="button secondary" disabled={deletion.busy || list.loading || !list.data?.deletable_total} onClick={() => deletion.remove(undefined, list.params)}><Trash2 size={16} />Xóa tất cả</button><button className="button secondary" disabled={list.loading} onClick={list.reload}><RefreshCw size={16} />Làm mới</button></PageTitle>
     <div className="toolbar"><SearchField label="Tìm người, thao tác hoặc mã tài nguyên" value={list.params.get("q") ?? ""} onChange={value => list.update("q", value)} />
       <select aria-label="Tài nguyên nhật ký" value={list.params.get("entity") ?? ""} onChange={event => list.update("entity", event.target.value)}><option value="">Mọi tài nguyên</option>{["project", "user", "organization", "transcript", "glossary", "export", "media", "minutes", "ocr"].map(name => <option key={name} value={name}>{name}</option>)}</select>
       <SearchField label="Lọc mã thao tác" value={list.params.get("action") ?? ""} onChange={value => list.update("action", value)} />
     </div>
-    {list.error ? <ErrorBox error={list.error} retry={list.reload} /> : !list.data ? <Loading /> : <div className="card table-wrap"><table><thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Thao tác</th><th>Tài nguyên</th><th>Chi tiết</th></tr></thead><tbody>{list.data.items.map(log => <tr key={log.audit_log_id}><td className="muted">{date(log.occurred_at)}</td><td>{log.full_name ?? "Hệ thống"}</td><td><span className="console-action">{log.action_name}</span></td><td>{log.entity_name}<small className="console-id">{log.entity_id}</small></td><td><details><summary>Xem thay đổi</summary><pre className="console-audit-detail">{JSON.stringify(log.change_detail ?? {}, null, 2)}</pre></details></td></tr>)}</tbody></table>{!list.data.items.length && <Empty title="Không có nhật ký phù hợp" />}<Pagination page={list.page} total={list.data.total} onChange={page => list.update("page", String(page))} /></div>}
+    {list.error ? <ErrorBox error={list.error} retry={list.reload} /> : list.loading ? <Loading /> : list.data && <div className="card table-wrap"><table><thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Thao tác</th><th>Tài nguyên</th><th>Chi tiết</th><th>Thao tác xóa</th></tr></thead><tbody>{list.data.items.map(log => <tr key={log.audit_log_id}><td className="muted">{date(log.occurred_at)}</td><td>{log.full_name ?? "Hệ thống"}</td><td><span className="console-action">{log.action_name}</span></td><td>{log.entity_name}<small className="console-id">{log.entity_id}</small></td><td><details><summary>Xem thay đổi</summary><pre className="console-audit-detail">{JSON.stringify(log.change_detail ?? {}, null, 2)}</pre></details></td><td>{log.can_delete && <button className="button secondary small" aria-label={`Xóa nhật ký ${log.audit_log_id}`} disabled={deletion.busy} onClick={() => deletion.remove(log.audit_log_id)}><Trash2 size={14} />Xóa</button>}</td></tr>)}</tbody></table>{!list.data.items.length && <Empty title="Không có nhật ký phù hợp" />}<Pagination page={list.page} total={list.data.total} onChange={page => list.update("page", String(page))} /></div>}
   </>;
 }
