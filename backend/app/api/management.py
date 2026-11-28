@@ -9,6 +9,7 @@ from ..core.access import pagination
 from ..core.db import connection, one, all_rows
 from .jobs import job_data
 from ..core.security import current_user, require_role
+from ..projects import audit_actor, audit_page
 
 router = APIRouter(prefix='/admin')
 JobStatus = Literal['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELED']
@@ -80,18 +81,10 @@ def uploads(q: str = '', status: UploadStatus | None = None, page: int = 1, page
 
 @router.get('/audit')
 def logs(q: str = '', entity: str = '', action: str = '', page: int = 1, page_size: int = 20, user=Depends(admin)):
-    limit, offset = pagination(page, page_size)
-    where = 'u.organization_id=%s AND (u.full_name ILIKE %s OR a.action_name ILIKE %s OR a.entity_id ILIKE %s OR a.entity_name ILIKE %s)'
-    params = [user['organization_id'], *(['%' + q[:200] + '%'] * 4)]
-    if entity:
-        where += ' AND a.entity_name=%s'; params.append(entity[:100])
-    if action:
-        where += ' AND a.action_name=%s'; params.append(action[:50])
-    source = ' FROM audit_log a JOIN app_user u USING(user_id) WHERE ' + where
     with connection() as conn:
-        total = one(conn, 'SELECT count(*) AS n' + source, params)['n']
-        rows = all_rows(conn, 'SELECT a.*,u.full_name' + source + ' ORDER BY a.occurred_at DESC,a.audit_log_id DESC LIMIT %s OFFSET %s', (*params, limit, offset))
-        return {'items': rows, 'total': total}
+        actor = audit_actor(conn, user)
+        require_role(actor, 'ADMIN')
+        return audit_page(conn, actor, q, entity, action, page, page_size)
 
 
 @router.get('/system')

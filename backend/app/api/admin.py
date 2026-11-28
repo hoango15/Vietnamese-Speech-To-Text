@@ -38,7 +38,8 @@ def users(q:str='',page:int=1,page_size:int=20,role:Role|None=None,active:bool|N
         if active is not None:
             where+=' AND is_active=%s';params.append(active)
         if available_company_owner:
-            where+=" AND user_role_code='COMPANY_OWNER' AND is_active AND company_id IS NULL"
+            where+=" AND user_role_code IN ('MEMBER','VIEWER','COMPANY_OWNER') AND is_active AND company_id IS NULL"
+            where+=" AND NOT EXISTS(SELECT 1 FROM company owned WHERE owned.owner_user_id=app_user.user_id)"
         rows=all_rows(conn,'SELECT *, (SELECT company_name FROM company c WHERE c.company_id=app_user.company_id) AS company_name FROM app_user WHERE '+where+' ORDER BY created_at DESC,user_id LIMIT %s OFFSET %s',(*params,limit,offset))
         return {'items':[public_user(u) for u in rows],'total':one(conn,'SELECT count(*) AS n FROM app_user WHERE '+where,params)['n']}
 
