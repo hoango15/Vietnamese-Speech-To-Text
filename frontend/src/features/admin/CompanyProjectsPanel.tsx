@@ -33,3 +33,6 @@ export function CompanyProjectsPanel({ owned, companyId }: { owned: boolean; com
       </Empty>}
   </section>;
 }
+
+// Bảng quản lý và điều phối dự án doanh nghiệp
+
