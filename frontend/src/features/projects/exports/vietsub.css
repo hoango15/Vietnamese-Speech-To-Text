@@ -1,0 +1,14 @@
+.vietsub-panel { padding: 22px; margin: 0 0 26px; border: 1px solid #cde5dd; border-radius: 12px; background: #f7fcfa; }
+.vietsub-panel .section-heading { align-items: flex-start; margin-bottom: 14px; }
+.vietsub-panel h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; font-size: 17px; }
+.vietsub-panel h3 svg { color: var(--teal); }
+.vietsub-panel .section-heading p, .vietsub-help { font-size: 12px; line-height: 1.7; }
+.vietsub-options { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; margin: 18px 0; }
+.vietsub-options > label:first-child { display: flex; flex-direction: column; gap: 7px; font-size: 12px; }
+.vietsub-options input[type=number] { width: 170px; background: white; }
+.vietsub-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.vietsub-result { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; border-top: 1px solid #d7e9e2; padding-top: 18px; margin-top: 18px; }
+.vietsub-result small { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; }
+.vietsub-preview-video { width: 100%; max-height: 65dvh; background: #111; border-radius: 9px; }
+.vietsub-transcript-entry { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 0 22px 18px; padding: 14px; border-radius: 8px; background: #eef8f4; font-size: 12px; }
+@media (max-width: 650px) { .vietsub-panel { padding: 16px; } .vietsub-options { gap: 16px; } .vietsub-actions .button { width: 100%; justify-content: center; } .vietsub-transcript-entry { margin-inline: 14px; } }

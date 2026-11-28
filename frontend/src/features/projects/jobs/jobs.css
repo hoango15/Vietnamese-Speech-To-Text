@@ -1,0 +1,18 @@
+.job-card { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.job-card p { margin: 0; overflow-wrap: anywhere; }
+.job-top, .job-progress-label, .job-timing, .job-stages > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.job-card .progress { height: 8px; overflow: hidden; border-radius: 8px; background: #e8edf2; }
+.job-card .progress > span { display: block; height: 100%; background: var(--teal); transition: width .2s ease; }
+.job-timing, .job-progress-hint { color: var(--muted); font-size: 12px; }
+.job-stages { display: grid; gap: 8px; }
+.job-stages .danger { flex-basis: 100%; }
+.jobs-panel { display: grid; gap: 16px; }
+.jobs-panel .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+.jobs-panel .toolbar input { flex: 1; min-width: 160px; }
+.project-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.project-tabs [aria-pressed="true"] { color: var(--teal); border-color: var(--teal); }
+.job-results .preview-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.processing-card { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+.processing-options { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.processing-options label:not(.checkbox-label) { display: grid; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .job-card .progress > span { transition: none; } }

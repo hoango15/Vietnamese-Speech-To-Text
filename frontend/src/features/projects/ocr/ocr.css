@@ -1,0 +1,19 @@
+.ocr-panel { min-width: 0; }
+.ocr-text {
+  width: 100%;
+  min-height: 500px;
+  line-height: 2;
+  margin-bottom: 13px;
+}
+.ocr-versions { display: grid; gap: 14px; }
+.ocr-versions summary { cursor: pointer; }
+.ocr-snapshot {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #f8fafb;
+  border-radius: 6px;
+  padding: 15px;
+  font: inherit;
+  line-height: 1.9;
+}
